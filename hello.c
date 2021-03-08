@@ -40,6 +40,30 @@ void writeText(char * data, int addressX, int addressY)
   }
 }
 
+void fillTile(unsigned char tile, int startAddressX, int startAddressY, int endAddressX, int endAddressY)
+{
+  int i, j = 0;
+  vram_adr(NTADR_A(startAddressX, startAddressY));
+  
+  for(i = startAddressX; i < endAddressX; i++)
+  {
+    for(j = startAddressY; j < endAddressY; j++)
+    {
+      vram_adr(NTADR_A(i, j));
+      vram_put(tile);
+    }
+  }
+}
+
+struct hitbox
+{
+  int x;
+  int y;
+  unsigned char w;
+  unsigned char h;
+  unsigned char sprite;
+};
+
 // main function, run after console reset
 void main(void) {
   char x = 30, y = 90;
@@ -47,6 +71,9 @@ void main(void) {
   unsigned char attrib = 0;
   unsigned int walk_timer = 1;
   unsigned int walk_wait = 0;
+  unsigned char floorLevel = 20;
+  unsigned char floorTile = 0xc0;
+  unsigned int i = 0, j = 0;
   
   // [sprite palette_0, sprite palette_1, ?, ?, ?, behind foreground, flip hor, flip vert]
   const char PALETTE[32] = 
@@ -70,8 +97,21 @@ void main(void) {
   // write text to name table
   //vram_adr(NTADR_A(2,2));		// set address
   //vram_write("This is\nJoshua Byron's\nfirst NES 'Game'!", 41);	// write bytes to video RAM
-  //vran_put for one byte
+  //vram_put for one byte
   writeText("This is\nJoshua Byron's\nfirst NES 'Game'!", 2, 2);
+  for(i = 1; i < 31; i++)
+  {
+    vram_adr(NTADR_A(i,floorLevel));
+    vram_put(floorTile);
+  }
+  
+  vram_adr(NTADR_A(29, 18));
+  vram_put(0xc4);
+  vram_put(0xc6);
+  vram_adr(NTADR_A(29, 19));
+  vram_put(0xc5);
+  vram_put(0xc7);
+  
   // enable PPU rendering (turn on screen)
   ppu_on_all();
 
@@ -89,7 +129,17 @@ void main(void) {
     //turn 0-> 1, turn 1-> -1
     walk_wait = (walk_wait+1) % walk_timer;
     //only updates every walk_timer num of frames
+    if(x >= 100)
+    {
+      attrib = 1 | (0 << 5) | (1 << 6) | (0 << 7);
+    }
+    if(x <= 1)
+    {
+      attrib = 2 | (0 << 5) | (0 << 6) | (0 << 7);
+    }
     x += (((attrib & 0x40) >> 6)* -2 + 1) * walk_wait == 0;
+    
+    
     
     //this makes it wait one frame in between updates
     ppu_wait_frame();
