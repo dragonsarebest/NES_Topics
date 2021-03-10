@@ -10,6 +10,8 @@ Finally, turn on the PPU to display video.
 #include "neslib.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+
 #include <nes.h>
 #include "vrambuf.h"
 #include "bcd.h"
@@ -83,6 +85,7 @@ typedef struct Actor
   char dx;
   char dy;
   unsigned char attribute;
+  unsigned char alive;
 } Actor;
 
 typedef struct SpriteActor
@@ -96,6 +99,7 @@ typedef struct MetaActor
   Actor act;
   unsigned char * metasprite;
 } MetaActor;
+
 
 void writeText(char * data, int addressX, int addressY)
 {
@@ -130,9 +134,9 @@ unsigned int getAbs(int n)
     return ((n + mask) ^ mask); 
 } 
 
-int doIHit(int x, int y, int x2, int y2)
+int doIHit(int x, int y, int x2, int y2, int hitXMin, int hitYMin)
 {
-  if(getAbs(x - x2) <= 8 && getAbs(y - y2) <= 8)
+  if(getAbs(x - x2) <= hitXMin && getAbs(y - y2) <= hitYMin)
   {
     return true;
   }
@@ -172,6 +176,8 @@ MetaActor player;
 DEF_METASPRITE_2x2(DoorMetaSprite, 0xC4, 0);
 MetaActor Door;
 
+SpriteActor brick;
+
 char PALETTE[32] = 
 {
   0x03, // screen color
@@ -192,6 +198,7 @@ void main(void) {
   //palette, behind, vert, horz
   unsigned int walk_timer = 5;
   unsigned int walk_wait = 0;
+  
   unsigned int door_timer = 60*4;
   unsigned int door_wait = 0;
   
@@ -200,6 +207,9 @@ void main(void) {
   
   unsigned int i = 0, j = 0;
   bool touchedDoor = false;
+  
+  unsigned char numBricks = 8;
+  SpriteActor singleBricks[8];
   
   // [sprite palette_0, sprite palette_1, ?, ?, ?, behind foreground, flip hor, flip vert]
   
@@ -222,15 +232,54 @@ void main(void) {
   Door.act.dy = 0;
   Door.act.attribute = 1 | (1 << 5) | (0 << 6) | (0 << 7);
   updateMetaSprite(Door.act.attribute, DoorMetaSprite);
+  Door.act.alive = true;
   
-  player.act.x = 30;
+  player.act.x = 60;
   player.act.y = Door.act.y;
   player.act.dx = 1;
   player.act.dy = 0;
   player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
   updateMetaSprite(player.act.attribute, PlayerMetaSprite);
-
-  // enable PPU rendering (turn on screen)
+  player.act.alive = true;
+  
+  brick.sprite = 0x0F;
+  brick.act.x = 30;
+  brick.act.y = Door.act.y;
+  brick.act.attribute = 1;
+  brick.act.alive = true;
+  
+  for(i = 0; i < numBricks; i++)
+  {
+    SpriteActor bck;
+    bck.sprite = 0x80;
+    bck.act.x = brick.act.x + 2 * (i%4);
+    bck.act.y = brick.act.y + i%8;
+    bck.act.attribute = 1+i%2;
+    bck.act.alive = true;
+    if(rand()*50 > 25)
+    {
+      bck.act.dx = -1;
+    }
+    else
+    {
+      bck.act.dx = 1;
+    }
+    
+    if(rand()*50 > 25)
+    {
+      bck.act.dy = -1;
+    }
+    else
+    {
+      bck.act.dy = 1;
+    }
+    
+    singleBricks[i] = bck;
+  }
+  
+  
+  
+  // enable PPU rendeing (turn on screen)
   ppu_on_all();
 
   //always updates @ 60fps
@@ -239,6 +288,9 @@ void main(void) {
     //game loop
     char cur_oam = 0; // max of 64 sprites on screen @ once w/out flickering
     
+    walk_wait = (walk_wait+1) % walk_timer;
+    //only updates every walk_timer num of frames
+    
     //x, y, sprite number, attribute, oam = sprite number
     //cur_oam = oam_spr(x, y, 0x19 ,attrib, cur_oam);
     
@@ -246,11 +298,38 @@ void main(void) {
     
     cur_oam = oam_meta_spr(Door.act.x, Door.act.y, cur_oam, DoorMetaSprite);
     
-    walk_wait = (walk_wait+1) % walk_timer;
-    //only updates every walk_timer num of frames
+    if(brick.act.alive == false)
+    {
+      for(i = 0; i < numBricks; i++)
+      {
+        if(singleBricks[i].act.alive == true)
+        {
+          cur_oam = oam_spr(singleBricks[i].act.x, singleBricks[i].act.y, singleBricks[i].sprite ,singleBricks[i].act.attribute, cur_oam);
+          if(walk_wait == 0)
+          {
+            singleBricks[i].act.x += singleBricks[i].act.dx;
+            singleBricks[i].act.y += singleBricks[i].act.dy;
+            /*
+            if(singleBricks[i].act.x <= 0 || singleBricks[i].act.x >= 256)
+            {
+              singleBricks[i].act.alive = false;
+            }
+            */
+          }
+        }
+      }
+    }
     
+    if(brick.act.alive == true)
+    {
+      cur_oam = oam_spr(brick.act.x, brick.act.y, brick.sprite ,brick.act.attribute, cur_oam);
+      if(doIHit(player.act.x, player.act.y, brick.act.x+8, brick.act.y, 8, 8))
+      {
+        brick.act.alive = false;
+      }
+    }
     
-    if(doIHit(player.act.x, player.act.y, Door.act.x+8, Door.act.y))
+    if(doIHit(player.act.x, player.act.y, Door.act.x+8, Door.act.y, 8, 8))
     {
       player.act.attribute = (player.act.attribute & 0xBF) | (1 << 6);
       //1011 1111 -> removes the current value there
@@ -273,7 +352,7 @@ void main(void) {
       }
     }
     
-    if(doIHit(player.act.x, player.act.y, 0, player.act.y))
+    if(doIHit(player.act.x, player.act.y, 0, player.act.y, 8, 8))
     {
       /*
       char str[64];
