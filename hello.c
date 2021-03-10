@@ -34,7 +34,7 @@ void updateMetaSprite(unsigned char attribute, unsigned char * meta)
 {
   //palette, is behind, flip_hor, flip_vert
   //1 | (0 << 5) | (1 << 6) | (0 << 7);
-  //0x30, 0x20, 0x40, 0x80 ^
+  //0x3, 0x20, 0x40, 0x80 ^
   
   meta[3] = attribute;
   meta[7] = attribute;
@@ -252,10 +252,8 @@ void main(void) {
     
     if(doIHit(player.act.x, player.act.y, Door.act.x+8, Door.act.y))
     {
-      //attrib = 2 | (0 << 5) | (0 << 6) | (0 << 7);
-      //player.attribute = 1 | (0 << 5) | (1 << 6) | (0 << 7);
-      player.act.attribute = (player.act.attribute & 0xFD) | (1 << 6);
-      //1111 1101 -> removes the current value there
+      player.act.attribute = (player.act.attribute & 0xBF) | (1 << 6);
+      //1011 1111 -> removes the current value there
       updateMetaSprite(player.act.attribute, PlayerMetaSprite);
       
       player.act.dx = -1;
@@ -277,23 +275,17 @@ void main(void) {
     
     if(doIHit(player.act.x, player.act.y, 0, player.act.y))
     {
+      /*
       char str[64];
-      //attrib = 0 | (0 << 5) | (1 << 6) | (0 << 7);
-      //player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
-      sprintf(str, "%d, %d, %d, %d",((player.act.attribute&0x30)), ((player.act.attribute&0x20) >> 5), ((player.act.attribute&0x40) >> 6), ((player.act.attribute&0x80) >> 7));
+      sprintf(str, "%d, %d, %d, %d",((player.act.attribute&0x3)), ((player.act.attribute&0x20) >> 5), ((player.act.attribute&0x40) >> 6), ((player.act.attribute&0x80) >> 7));
       updateScreen(2, 5, str, 12);
-      ppu_wait_frame();
-      ppu_wait_frame();
-      ppu_wait_frame();
-      ppu_wait_frame();
-      ppu_wait_frame();
-      player.act.attribute = (player.act.attribute & 0xFD);
-      //1111 1101 -> removes the current value there (should turn 1 to 0)
+      */
+
+      player.act.attribute = (player.act.attribute & 0xBF);
+      //1011 1111 -> removes the current value there (should turn 1 to 0)
       updateMetaSprite(player.act.attribute, PlayerMetaSprite);
       
       player.act.dx = 1;
-      sprintf(str, "%d, %d, %d, %d",((player.act.attribute&0x30)), ((player.act.attribute&0x20) >> 5), ((player.act.attribute&0x40) >> 6), ((player.act.attribute&0x80) >> 7));
-      updateScreen(2, 5, str, 12);
     }
 
     if(walk_wait == 0)
