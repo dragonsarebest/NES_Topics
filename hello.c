@@ -1,9 +1,7 @@
-
 /*
-A simple "hello world" example.
-Set the screen background color and palette colors.
-Then write a message to the nametable.
-Finally, turn on the PPU to display video.
+game idea:
+you're storming a castle and can break blocks and other objects -> they explode into chunks
+I will need to sprinkle in some larger chunks too.....
 */
 
 #include "neslib.h"
