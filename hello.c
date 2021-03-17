@@ -31,6 +31,12 @@ unsigned char name[]={\
 #define NES_MIRRORING 1("vertical", 0 = "horizontal")
 //Nametable A starts at 0x2000, Nametable B starts at 0x2400
 
+#define WORLD_WIDTH = 256*2
+#define WORLD_HEIGHT = 256;
+
+int world_x = 0;
+int world_y = 0;
+
 
 void updateMetaSprite(unsigned char attribute, unsigned char * meta)
 {
@@ -197,7 +203,6 @@ char PALETTE[32] =
 };
 
 char startOfground = 0x7f;
-
 
 #define MAX_JUMP 9
 char jumpTable[MAX_JUMP] = 
@@ -419,12 +424,7 @@ void main(void) {
       }
     }
 
-    {
-      //int x_pos = player.act.x;
-      //int y_pos = 0;
-      //max val is 512
-      //scroll(x_pos, y_pos);
-    }
+    
     
     if(player.act.grounded && playerInAir)
     {
@@ -456,8 +456,25 @@ void main(void) {
     }
 
     
-    player.act.x += player.act.dx * player.act.moveSpeed;
-    player.act.y += player.act.dy * player.act.jumpSpeed;
+    
+    {
+      int deltaX = 0;
+      int deltaY = 0;
+      deltaX = player.act.dx * player.act.moveSpeed;
+      deltaY = player.act.dy * player.act.jumpSpeed;
+      
+      if(player.act.x + deltaX > 256/2)
+      {
+        world_x += deltaX;
+      }
+      else
+      {
+        player.act.x += deltaX;
+      }
+
+      //max val is 512
+      scroll(world_x, world_y);
+    }
     
     //this makes it wait one frame in between updates
     ppu_wait_frame();
