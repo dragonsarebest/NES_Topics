@@ -82,11 +82,12 @@ typedef struct Actor
 {
   unsigned char x;
   unsigned char y;
-  char dx;
-  char dy;
+  int dx;
+  int dy;
   unsigned char attribute;
   unsigned char alive;
   unsigned char moveSpeed;
+  unsigned char jumpSpeed;
   char jumpTimer;
   char maxlife;
   char lifetime;
@@ -197,11 +198,20 @@ char PALETTE[32] =
 
 char startOfground = 0x7f;
 
+
+#define MAX_JUMP 9
+char jumpTable[MAX_JUMP] = 
+{
+  -8, -4, -2, -1, 0, 1, 2, 4, 8
+};
+
 // main function, run after console reset
 void main(void) {
   
   unsigned char floorLevel = 20;
   unsigned char floorTile = 0xc0;
+  byte lastFacingRight = true;
+  byte playerInAir = false;
   
   SpriteActor singleBricks[32];
   unsigned char numActive = 0;
@@ -235,6 +245,7 @@ void main(void) {
   updateMetaSprite(player.act.attribute, PlayerMetaSprite);
   player.act.alive = true;
   player.act.moveSpeed = 5;
+  player.act.jumpSpeed = 3;
   player.act.grounded = true;
   
   brick.sprite = 0x0F;
@@ -289,10 +300,11 @@ void main(void) {
     //game loop
     char cur_oam = 0; // max of 64 sprites on screen @ once w/out flickering
     char res;
-    char temp;
+    //char res2;
+    int temp;
     player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6);
     //player.act.dy = ((pad_result & 0x20) >> 5) + -1 * ((pad_result & 0x10) >> 4);
-    player.act.dy = -1 * (player.act.grounded & ((pad_result & 0x10) >> 4));
+    //player.act.dy = -1 * (player.act.grounded & ((pad_result & 0x10) >> 4));
     
     
     if((pad_result&0x08)>>3 && numActive == 0)
@@ -303,34 +315,12 @@ void main(void) {
     //check if player is touching the ground
     //if there is a grounded block below player then the player is also grounded
     
-    res = getchar_vram((player.act.x/8), (player.act.y/8)+2);
-    /*
-    {
-      char result[16];
-      //sprintf(dx, "%d", player.act.dx);
-      sprintf(result, "%02X", res);
-      updateScreen(2, 5, result, 12);
-
-      sprintf(result, "%d", res);
-      updateScreen(2, 6, result, 12);
-    }
-    */
-
-    //if y val > y, else if theyre equal
-    // 1111 0000 = x, 0000 1111 = y
-    //startOfground & 0xF0;
-    //startOfground & 0x0F;
-    
-    {
-      char result[16];
-      sprintf(result, "X: %02X", res & 0xF0);
-      updateScreen(2, 7, result, 12);
-
-      sprintf(result, "X: %02X", startOfground & 0xF0);
-      updateScreen(2, 8, result, 12);
-    }
+    res = getchar_vram((player.act.x/8), ((player.act.y)/8)+2);
+    //res2 = getchar_vram(((player.act.x + player.act.dx*player.act.moveSpeed)/8), ((player.act.y + player.act.dy*player.act.jumpSpeed)/8 +2));
+    //res = (res & 0xF0) > (startOfground & 0xF0) || (res2 & 0xF0) > (startOfground & 0xF0);
+    res = (res & 0xF0) > (startOfground & 0xF0);
       
-    if( (res & 0xF0) > (startOfground & 0xF0))
+    if( res)
     {
       player.act.grounded = true;
     }
@@ -350,25 +340,32 @@ void main(void) {
     }
     
     
+    {
+      char dx[16];
+      sprintf(dx, "grounded %d", player.act.grounded);
+      updateScreen(2, 6, dx, 12);
+    }
+    
     //char temp = (player.act.dx == -1);
-    temp = 0;
-    if((pad_result & 0x80)>>7)
+    temp = -1;
+    if((pad_result & 0x80)>>7 && lastFacingRight == false)
     {
       temp = 0;
+      lastFacingRight = true;
     }
     else
     {
-      if((pad_result & 0x40)>>6)
+      if((pad_result & 0x40)>>6 && lastFacingRight)
       {
         temp = 1;
-      }
-      else
-      {
-        //temp = -1;
+        lastFacingRight = false;
       }
     }
-    player.act.attribute = (player.act.attribute & 0xBF) | (temp  << 6);
-    updateMetaSprite(player.act.attribute, PlayerMetaSprite);
+    if(temp != -1)
+    {
+    	player.act.attribute = (player.act.attribute & 0xBF) | (temp  << 6);
+    	updateMetaSprite(player.act.attribute, PlayerMetaSprite);
+    }
     
     cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
     cur_oam = oam_meta_spr(Door.act.x, Door.act.y, cur_oam, DoorMetaSprite);
@@ -429,19 +426,38 @@ void main(void) {
       //scroll(x_pos, y_pos);
     }
     
-    if(player.act.grounded == true && ((pad_result & 0x10) >> 4))
+    if(player.act.grounded && playerInAir)
     {
-      //if grounded and you try to jump...
-      player.act.dy = -1;
+      playerInAir = false;
+      player.act.dy = 0;
+      player.act.jumpTimer = 0;
     }
     
-    if(player.act.grounded == false && (res & 0xF0) < (startOfground & 0xF0))
+    if(player.act.jumpTimer == 0)
     {
-      player.act.dy = 1;
+      if(player.act.grounded == true && ((pad_result & 0x10) >> 4))
+      {
+        //if grounded and you try to jump...
+        player.act.jumpTimer = MAX_JUMP;
+        player.act.dy = jumpTable[MAX_JUMP-player.act.jumpTimer];
+        player.act.jumpTimer--;
+	playerInAir = true;
+      }
+
     }
+
+    if(playerInAir)
+    {
+      //going up or down
+      player.act.dy = jumpTable[MAX_JUMP-player.act.jumpTimer];
+      if(player.act.jumpTimer != 0)
+        player.act.jumpTimer--;
+
+    }
+
     
     player.act.x += player.act.dx * player.act.moveSpeed;
-    player.act.y += player.act.dy * player.act.moveSpeed;
+    player.act.y += player.act.dy * player.act.jumpSpeed;
     
     //this makes it wait one frame in between updates
     ppu_wait_frame();
