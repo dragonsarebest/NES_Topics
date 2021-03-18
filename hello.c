@@ -373,7 +373,8 @@ void main(void) {
   byte lastFacingRight = true;
   byte playerInAir = false;
   
-  Destructable destroybois[32];
+  //Destructable destroybois[32];
+  Destructable brick;
   
   Particles singleBricks[NUM_BRICKS];
   unsigned char numActive = 0;
@@ -395,8 +396,6 @@ void main(void) {
   
   player.act.x = 60;
   player.act.y = 18*8;
-  //player.act.x = 3 *8;
-  //player.act.y = 16*8;
   
   player.act.dx = 1;
   player.act.dy = 0;
@@ -408,21 +407,14 @@ void main(void) {
   player.act.grounded = true;
   
   
-  for(i = 0; i < 1; i++)
-  {
-    Destructable brick;
-    brick.sprite = 0x0F;
-    brick.x = 100;
-    brick.y = 18*8 + 2;
-    brick.attribute = 1;
-    brick.alive = true;
-    destroybois[i] = brick;
-    //setting this value too
-    setGround(brick.x/8, brick.y/8, 0x03);
-  }
+  brick.sprite = 0x0F;
+  brick.x = 100;
+  brick.y = 18*8 + 2;
+  brick.attribute = 1;
+  brick.alive = true;
   
-  //initalize brick spray
-  //randomizeParticle(singleBricks, brickSpeed, brick.act.x, brick.act.y);
+  setGround(brick.x/8, brick.y/8, 0x03);
+  
   
   for( i = 0; i < SHADOW_SIZE; i++)
   {
@@ -499,14 +491,22 @@ void main(void) {
       */
     }
     
+    {
+      char dx[32];
+      //sprintf(dx, "%d", player.act.dx);
+      sprintf(dx, "bricked: %d, %d", brick.x/8, brick.y/8);
+      updateScreen(2, 10, dx, 32);
+      sprintf(dx, "player: %d, %d   ", player.act.x/8, player.act.y/8);
+      updateScreen(2, 9, dx, 32);
+    }
+    
     if((pad_result&0x08)>>3 && numActive == 0)
     {
       //pressing enter respawns brick...
       for(i = 0; i < 1; i++)
       {
-        destroybois[i].alive = true;
-        //setting this value too
-        setGround(destroybois[i].x/8, destroybois[i].y/8, 0x03);
+        brick.alive = true;
+        setGround(brick.x/8, brick.y/8, 0x03);
       }
     }
     
@@ -519,9 +519,6 @@ void main(void) {
       
       
       res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 1); // 1 = ground, 0 = breakable
-      //res = res | checkGround((player.act.x/8)+1, ((player.act.y)/8)+2, 1);
-      //res2 = checkGround(((player.act.x + player.act.dx * player.act.moveSpeed)/8), ((player.act.y + player.act.dy * player.act.jumpSpeed)/8)+2, 1);
-      //res = res | res2;
     }
     
     {
@@ -640,14 +637,11 @@ void main(void) {
     }
     */
     
-    //if(brick.act.alive == true)
-    for(i = 0; i < 1; i++)
+    if(brick.alive == true)
     {
-      if(destroybois[i].alive)
-      {
-        cur_oam = oam_spr(destroybois[i].x, destroybois[i].y, destroybois[i].sprite , destroybois[i].attribute, cur_oam);
-      }
-      //res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 0) | searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
+      cur_oam = oam_spr(brick.x, brick.y, brick.sprite , brick.attribute, cur_oam);
+
+    //res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 0) | searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
       //res checks bellow and in the facing dir of the player...
       res = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
       {
@@ -681,23 +675,21 @@ void main(void) {
         
         
         setGround(itemX, itemY, 0);
-        destroybois[i].alive = false;
+        //destroybois[i].alive = false;
+        brick.alive = false;
         
 	numActive = NUM_BRICKS;
         for(i = 0; i < numActive; i++)
         {
           singleBricks[i].lifetime = brickLifetime;
-          singleBricks[i].x = destroybois[i].x+8;
-          singleBricks[i].y = destroybois[i].y+8;
+          singleBricks[i].x = brick.x+8;
+          singleBricks[i].y = brick.y+8;
+          randomizeParticle(singleBricks, brickSpeed, brick.x, brick.y);
           
-          randomizeParticle(singleBricks, brickSpeed, destroybois[i].x, destroybois[i].y);
         }
         
       }
-      
     }
-
-    
     
     if(player.act.grounded && playerInAir)
     {
