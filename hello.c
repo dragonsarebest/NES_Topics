@@ -31,44 +31,16 @@ unsigned char name[]={\
 #define NES_MIRRORING 1("vertical", 0 = "horizontal")
 //Nametable A starts at 0x2000, Nametable B starts at 0x2400
 
-#define WORLD_WIDTH = 256*2
+#define WORLD_WIDTH = 240*2
 #define WORLD_HEIGHT = 256;
 
 //1920 bits, 1 for am i ground, 1 for am i breakable...
-char shadow[240];
+#define SHADOW_SIZE 240
+char shadow[SHADOW_SIZE];
 
-void setGround(int x, int y, byte placeMe, byte val)
-{
-  //val = 0 if you want the 1st value and  = 1 if you want the 2nd
-  int bytenum;
-  int remainder;
-  byte mask = 0xFF;
-  int bitNum = (y*30*2 + x*2);
-  bytenum = bitNum >> 3;//same as dividing by 8...
-  remainder = (bitNum & 0x07) + val; //the lost 3 bits from divison
-  //go remainder number of bits into shadow
-  
-  //(orignalNumber & 0x??) | (byteToPlace  << remainder);
-  //remainder is 0->8
-  mask = mask ^ (1 >> (8-remainder));
-  shadow[bytenum] = shadow[bytenum] & mask | placeMe >> (8-remainder);
-}
-
-short checkGround(int x, int y, byte val)
-{
-  //val = 0 if you want the 1st value and  = 1 if you want the 2nd
-  //32 columns, 30 rows
-  int bytenum;
-  int remainder;
-  int value;
-  int bitNum = (y*30*2 + x*2);
-  bytenum = bitNum >> 3;//same as dividing by 8...
-  remainder = (bitNum & 0x07) + val; //the lost 3 bits from divison
-  //go remainder number of bits into shadow
-  value = ((shadow[bytenum] << remainder) & 0x80) << 7;
-  
-  return value;
-}
+byte outsideHelper; //used for debugging
+byte outsideHelper2;
+byte outsideHelper3;
 
 void updateScreen(unsigned char column, unsigned char row, char * buffer, unsigned char num_bytes)
 {
@@ -77,6 +49,60 @@ void updateScreen(unsigned char column, unsigned char row, char * buffer, unsign
   vrambuf_put(NTADR_A(column, row), buffer, num_bytes);
   vrambuf_flush();
 }
+
+void writeBinary(int x, int y, byte value)
+{
+  char dx[16];
+  //sprintf(dx, "%d", player.act.dx);
+  sprintf(dx, "%d %d %d %d %d %d %d %d", (value&0x80)>>7, (value&0x40)>>6, (value&0x20) >>5, (value&0x10)>>4, (value&0x08)>>3, (value&0x04)>>2, (value&0x02)>>1, value&0x01);
+  updateScreen(x, y, dx, 16);
+}
+
+
+void setGround(int x, int y, byte placeMe)
+{
+  //placeMe is the replacement 2 bits of data
+  int bytenum;
+  int remainder;
+  byte mask = 0xFF;
+  int bitNum = (y*30*2 + x*2);
+  bytenum = bitNum >> 3;//same as dividing by 8...
+  remainder = (bitNum & 0x07); //the lost 3 bits from divison
+  //go remainder number of bits into shadow
+  
+  //(orignalNumber & 0x??) | (byteToPlace  << remainder);
+  //remainder is 0->8
+  mask = mask ^ (0x03 << (remainder));
+  
+  //writeBinary(2, 8, shadow[bytenum]);
+  //outsideHelper = shadow[bytenum];
+  shadow[bytenum] = (shadow[bytenum] & mask | placeMe << (remainder));
+  //outsideHelper = shadow[bytenum];
+  //writeBinary(2, 9, shadow[bytenum]);
+}
+
+short checkGround(int x, int y, byte val)
+{
+  //val = 0 if you want the 1st value and  = 1 if you want the 2nd
+  // 1 = ground, 0 = breakable
+  
+  //32 columns, 30 rows
+  int bytenum;
+  int remainder;
+  int value;
+  int bitNum = (y*30*2 + x*2);
+  bytenum = bitNum >> 3;//same as dividing by 8...
+  remainder = (bitNum & 0x07) + val; //the lost 3 bits from divison
+  //go remainder number of bits into shadow
+  value = (shadow[bytenum] >> remainder) & 0x01;
+  //outsideHelper3 = value;
+  //outsideHelper2 = 0x01;
+  //outsideHelper = (shadow[bytenum] >> remainder);
+  //writeBinary(2, 10, shadow[bytenum]);
+  return value;
+}
+
+
 
 byte getchar_vram(byte x, byte y) {
   // compute VRAM read address
@@ -290,6 +316,9 @@ void main(void) {
   
   player.act.x = 60;
   player.act.y = 18*8;
+  //player.act.x = 3 *8;
+  //player.act.y = 16*8;
+  
   player.act.dx = 1;
   player.act.dy = 0;
   player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
@@ -343,6 +372,10 @@ void main(void) {
   }
   
   
+  for( i = 0; i < SHADOW_SIZE; i++)
+  {
+    shadow[i] = 0x00;
+  }
   
   //set shadow
   for(i = 0; i < 30; i++)
@@ -350,13 +383,19 @@ void main(void) {
     //32 columns, 30 rows
     for(j = 0; j < 32; j++)
     {
-      //0000 0010 just ground 0x02
+      //0000 0010 just breakable 0x02
       //0000 0011 ground and breakable 0x03
-      //0000 0001 just breakable, not ground 0x01
-      
-      setGround(i, j, 0x02, 0);
+      //0000 0001 just ground 0x01
+      if(j == floorLevel)
+      {
+      	setGround(i, j, 0x02);
+      }
     }
   }
+  
+  
+  //setting this value too
+  setGround(brick.act.x/8, brick.act.y/8, 0x03);
   
   // enable PPU rendeing (turn on screen)
   ppu_on_all();
@@ -364,33 +403,101 @@ void main(void) {
   //always updates @ 60fps
   while (1)
   {
+    
+    
+    
     char pad_result= pad_poll(0) | pad_poll(1);
     
     //game loop
     char cur_oam = 0; // max of 64 sprites on screen @ once w/out flickering
     char res;
+    
     player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6);
     
     if((pad_result&0x08)>>3 && numActive == 0)
     {
+      //pressing enter respawns brick...
       brick.act.alive = true;
+      setGround(brick.act.x/8, brick.act.y/8, 0x03);
     }
     
-    //check if player is touching the ground
-    //if there is a grounded block below player then the player is also grounded
-    
-    res = getchar_vram((player.act.x/8), ((player.act.y)/8)+2);
-    res = (res & 0xF0) > (startOfground & 0xF0);
+    {
+      char res2;
+      int x1 = (player.act.x/8);
+      int x2 = ((player.act.x + player.act.dx * player.act.moveSpeed)/8);
+      int y1 = (player.act.y/8) + 2;
+      int y2 = ((player.act.y + player.act.dy * player.act.jumpSpeed)/8)+2;
       
-    if( res)
+      
+      
+      res = checkGround(x1, y1, 1);
+      
+      while(x1 != x2 && y1 != y2)
+      {
+        if(x1 != x2)
+        {
+          x1 += player.act.dx;
+        }
+        if(y1 != y2)
+        {
+          y1 += player.act.dy;
+        }
+        res2 = checkGround(x1, y1, 1);
+        res = res | res2;
+      }
+      
+      res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 1); // 1 = ground, 0 = breakable
+      
+      //res2 = checkGround(((player.act.x + player.act.dx * player.act.moveSpeed)/8), ((player.act.y + player.act.dy * player.act.jumpSpeed)/8)+2, 1);
+      //res = res | res2;
+    }
+    
+    {
+    //right, left, down, up, select start, B, A
+    //shows the player's input
+      char dx[32];
+      //sprintf(dx, "%d", player.act.dx);
+      sprintf(dx, "shadow chunk: %d", res);
+      updateScreen(2, 6, dx, 32);
+    }
+    
+    if(res == 1)
     {
       player.act.grounded = true;
     }
     else
     {
       player.act.grounded = false;
+      
+      
+      //if(player.act.jumpTimer == 0)
+      {
+        //start falling!
+        player.act.jumpTimer = MAX_JUMP/2;
+        playerInAir = true;
+      }
+      
     }
     
+    /*
+    //outsideHelper = checkGround(1, floorLevel, 0);
+    outsideHelper = shadow[(floorLevel*30*2 + 1*2) >> 3];
+    {
+      int bytenum;
+      int remainder;
+      int value;
+      int bitNum = (floorLevel*30*2 + 1*2);
+      bytenum = bitNum >> 3;//same as dividing by 8...
+      remainder = (bitNum & 0x07) + 1; //the lost 3 bits from divison
+      //go remainder number of bits into shadow
+      value = (shadow[bytenum] >> remainder) & 0x01;
+      
+      outsideHelper = value;
+    }
+    //outsideHelper = shadow[151];
+    outsideHelper2 = player.act.x/8;
+    outsideHelper3 = (player.act.y/8) + 2;
+    */
     
     {
     //right, left, down, up, select start, B, A
@@ -398,7 +505,7 @@ void main(void) {
       char dx[16];
       //sprintf(dx, "%d", player.act.dx);
       sprintf(dx, "%d %d %d %d %d %d %d %d", (pad_result&0x80)>>7, (pad_result&0x40)>>6, (pad_result&0x20) >>5, (pad_result&0x10)>>4, (pad_result&0x08)>>3, (pad_result&0x04)>>2, (pad_result&0x02)>>1, pad_result&0x01);
-      updateScreen(2, 5, dx, 12);
+      updateScreen(2, 5, dx, 16);
     }
     
     //char temp = (player.act.dx == -1);
@@ -447,13 +554,28 @@ void main(void) {
       }
     }
     
+    /*
+    {
+    //right, left, down, up, select start, B, A
+    //shows the player's input
+      char dx[16];
+      //sprintf(dx, "%d", player.act.dx);
+      sprintf(dx, "%d %d", (player.act.x/8), ((player.act.y)/8)+2);
+      updateScreen(2, 7, dx, 16);
+      
+      sprintf(dx, "%d %d", brick.act.x/8, brick.act.y/8);
+      updateScreen(2, 8, dx, 16);
+    }
+    */
     
     if(brick.act.alive == true)
     {
       cur_oam = oam_spr(brick.act.x, brick.act.y, brick.sprite ,brick.act.attribute, cur_oam);
-      //&& pad_res&0x
-      if(rectanglesHit(player.act.x, player.act.y, 16, 16, brick.act.x, brick.act.y, 8, 8) )
+      res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 0);
+      
+      if((res == 1 || rectanglesHit(player.act.x, player.act.y, 16, 16, brick.act.x, brick.act.y, 8, 8)) && pad_result & 0x04)
       {
+        setGround(brick.act.x/8, brick.act.y/8, 0);
         brick.act.alive = false;
 	numActive = NUM_BRICKS;
         for(i = 0; i < numActive; i++)
@@ -464,6 +586,7 @@ void main(void) {
         }
         
       }
+      
     }
 
     
@@ -499,6 +622,9 @@ void main(void) {
     }
 
     
+    player.act.x += player.act.dx * player.act.moveSpeed;
+    player.act.y += player.act.dy * player.act.jumpSpeed;
+    
     
     {
       int deltaX = 0;
@@ -520,6 +646,7 @@ void main(void) {
       //max val is 512
       scroll(world_x, world_y);
     }
+    
     
     //this makes it wait one frame in between updates
     ppu_wait_frame();
