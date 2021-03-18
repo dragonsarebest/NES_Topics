@@ -43,6 +43,89 @@ byte outsideHelper; //used for debugging
 byte outsideHelper2;
 byte outsideHelper3;
 
+//define variables here
+
+
+typedef struct Particles
+{
+  unsigned char x;
+  unsigned char y;
+  int dx;
+  int dy;
+  unsigned char attribute;
+  short lifetime;
+  
+  unsigned char sprite;
+} Particles;
+
+typedef struct Destructable
+{
+  unsigned char x;
+  unsigned char y;
+  unsigned char sprite;
+  unsigned char alive;
+  unsigned char attribute;
+} Destructable;
+
+typedef struct Actor
+{
+  unsigned char x;
+  unsigned char y;
+  int dx;
+  int dy;
+  unsigned char attribute;
+  unsigned char alive;
+  unsigned char moveSpeed;
+  unsigned char jumpSpeed;
+  char jumpTimer;
+  char grounded;
+} Actor;
+
+typedef struct SpriteActor
+{
+  Actor act;
+  unsigned char sprite;
+} SpriteActor;
+
+typedef struct MetaActor
+{
+  Actor act;
+  unsigned char * metasprite;
+} MetaActor;
+
+
+int world_x = 0;
+int world_y = 0;
+
+DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
+MetaActor player;
+
+char PALETTE[32] = 
+{
+  0x03, // screen color
+  0x24, 0x16, 0x20, 0x0,// background palette 0
+  0x1c, 0x20, 0x2c, 0x0,// background palette 1
+  0x00, 0x1a, 0x20, 0x0,// background palette 2
+  0x00, 0x1a, 0x20, 0x0,// background palette 3
+
+  0x3F, 0x3F, 0x22, 0x0,// sprite palette 0
+  0x00, 0x37, 0x25, 0x0,// sprite palette 1
+  0x36, 0x21, 0x19, 0x0,// sprite palette 2
+  0x1d, 0x37, 0x2b,// sprite palette 3
+};
+
+char startOfground = 0x7f;
+
+#define MAX_JUMP 9
+char jumpTable[MAX_JUMP] = 
+{
+  -8, -4, -2, -1, 0, 1, 2, 4, 8
+};
+
+#define NUM_BRICKS 16
+
+//functions defined here
+
 void updateScreen(unsigned char column, unsigned char row, char * buffer, unsigned char num_bytes)
 {
   vrambuf_clear();
@@ -51,7 +134,7 @@ void updateScreen(unsigned char column, unsigned char row, char * buffer, unsign
   vrambuf_flush();
 }
 
-void writeBinary(int x, int y, byte value)
+void writeBinary(unsigned char x, unsigned char y, byte value)
 {
   char dx[16];
   //sprintf(dx, "%d", player.act.dx);
@@ -59,7 +142,7 @@ void writeBinary(int x, int y, byte value)
   updateScreen(x, y, dx, 16);
 }
 
-void setGround(int x, int y, byte placeMe)
+void setGround(unsigned char x, unsigned char y, byte placeMe)
 {
   //placeMe is the replacement 2 bits of data
   int bytenum;
@@ -81,7 +164,7 @@ void setGround(int x, int y, byte placeMe)
   //writeBinary(2, 9, shadow[bytenum]);
 }
 
-short checkGround(int x, int y, byte val)
+short checkGround(unsigned char x, unsigned char y, byte val)
 {
   //val = 0 if you want the 1st value and  = 1 if you want the 2nd
   // 1 = ground, 0 = breakable
@@ -170,47 +253,8 @@ void updateMetaSprite(unsigned char attribute, unsigned char * meta)
   }
 }
 
-typedef struct Particles
-{
-  unsigned char x;
-  unsigned char y;
-  int dx;
-  int dy;
-  unsigned char attribute;
-  short lifetime;
-  
-  unsigned char sprite;
-}Particles;
 
-
-typedef struct Actor
-{
-  unsigned char x;
-  unsigned char y;
-  int dx;
-  int dy;
-  unsigned char attribute;
-  unsigned char alive;
-  unsigned char moveSpeed;
-  unsigned char jumpSpeed;
-  char jumpTimer;
-  char grounded;
-} Actor;
-
-typedef struct SpriteActor
-{
-  Actor act;
-  unsigned char sprite;
-} SpriteActor;
-
-typedef struct MetaActor
-{
-  Actor act;
-  unsigned char * metasprite;
-} MetaActor;
-
-
-void writeText(char * data, int addressX, int addressY)
+void writeText(char * data, unsigned char addressX, unsigned char addressY)
 {
   char * line = data;
   int startIndex = 0;
@@ -243,7 +287,7 @@ unsigned int getAbs(int n)
     return ((n + mask) ^ mask); 
 } 
 
-short rectanglesHit(int x, int y, int width, int height, int x2, int y2, int width2, int height2)
+short rectanglesHit(unsigned char x, unsigned char y, unsigned char width, unsigned char height, unsigned char x2, unsigned char y2, unsigned char width2, unsigned char height2)
 {
   if(!(x ^ x2) && !(y ^ y2))
     return true;
@@ -257,94 +301,34 @@ short rectanglesHit(int x, int y, int width, int height, int x2, int y2, int wid
   return true; 
 }
 
-//define variables here
 
-
-int world_x = 0;
-int world_y = 0;
-
-DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
-MetaActor player;
-
-SpriteActor brick;
-
-char PALETTE[32] = 
+byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte facingRight, byte collision)
 {
-  0x03, // screen color
-  0x24, 0x16, 0x20, 0x0,// background palette 0
-  0x1c, 0x20, 0x2c, 0x0,// background palette 1
-  0x00, 0x1a, 0x20, 0x0,// background palette 2
-  0x00, 0x1a, 0x20, 0x0,// background palette 3
+  //if checking for collision = 1 .. look forward 1 less when lookung right
+  //char infront = checkGround((x/8)+ (facingRight*3 -1), ((y)/8), groundOrBreak);
+  //char infront2 = checkGround((x/8)+ (facingRight*3 -1), ((y)/8)+1, groundOrBreak);
+  char infront = checkGround((x/8)+facingRight, ((y)/8), groundOrBreak);
+  infront = infront + checkGround((x/8)+facingRight, ((y)/8)+1, groundOrBreak);
+  
+  infront = infront + checkGround((x/8)+(facingRight*3 - 1 - collision*facingRight), ((y)/8), groundOrBreak);
+  infront = infront + checkGround((x/8)+(facingRight*3 - 1 - collision*facingRight), ((y)/8)+1, groundOrBreak);
+  
+  //outsideHelper = (x/8)+ (facingRight*3 -1);
+  //outsideHelper = (x/8) +facingRight;
+  //outsideHelper2 = ((y)/8)+1;
+  outsideHelper3 = shadow[(outsideHelper2*30*2 + outsideHelper*2) >> 3];
+  return infront;
+}
 
-  0x3F, 0x3F, 0x22, 0x0,// sprite palette 0
-  0x00, 0x37, 0x25, 0x0,// sprite palette 1
-  0x36, 0x21, 0x19, 0x0,// sprite palette 2
-  0x1d, 0x37, 0x2b,// sprite palette 3
-};
-
-char startOfground = 0x7f;
-
-#define MAX_JUMP 9
-char jumpTable[MAX_JUMP] = 
+void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
 {
-  -8, -4, -2, -1, 0, 1, 2, 4, 8
-};
-
-#define NUM_BRICKS 16
-
-// main function, run after console reset
-void main(void) {
-  
-  unsigned char floorLevel = 20;
-  unsigned char floorTile = 0xc0;
-  
-  byte lastFacingRight = true;
-  byte playerInAir = false;
-  
-  Particles singleBricks[NUM_BRICKS];
-  unsigned char numActive = 0;
-  short brickSpeed = 5;
-  short brickLifetime = 10;
-
-  unsigned int i = 0, j = 0;
-      
-  pal_all(PALETTE);// generally before game loop (in main)
-  
-  writeText("This is\nJoshua Byron's\nfirst NES 'Game'!", 2, 2);
-  for(i = 1; i < 31; i++)
-  {
-    vram_adr(NTADR_A(i,floorLevel));
-    vram_put(floorTile);
-  }
-  
-  
-  player.act.x = 60;
-  player.act.y = 18*8;
-  //player.act.x = 3 *8;
-  //player.act.y = 16*8;
-  
-  player.act.dx = 1;
-  player.act.dy = 0;
-  player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
-  
-  player.act.alive = true;
-  player.act.moveSpeed = 5;
-  player.act.jumpSpeed = 3;
-  player.act.grounded = true;
-  
-  brick.sprite = 0x0F;
-  brick.act.x = 30;
-  brick.act.y = 18*8;
-  brick.act.attribute = 1;
-  brick.act.alive = true;
-  
-  //initalize brick spray
+  int i = 0;
   for(i = 0; i < NUM_BRICKS; i++)
   {
     Particles bck;
     int temp;
-    bck.x = brick.act.x + 2 * (i%4);
-    bck.y = brick.act.y + i%8;
+    bck.x = x + 2 * (i%4);
+    bck.y = y + i%8;
     bck.attribute = 1+i%2;
     bck.lifetime = 20;
     
@@ -374,7 +358,71 @@ void main(void) {
     
     singleBricks[i] = bck;
   }
+}
+
+
+//sprite char + position...
+
+
+// main function, run after console reset
+void main(void) {
   
+  unsigned char floorLevel = 20;
+  unsigned char floorTile = 0xc0;
+  
+  byte lastFacingRight = true;
+  byte playerInAir = false;
+  
+  Destructable destroybois[32];
+  
+  Particles singleBricks[NUM_BRICKS];
+  unsigned char numActive = 0;
+  
+  short brickSpeed = 5;
+  short brickLifetime = 10;
+
+  unsigned int i = 0, j = 0;
+      
+  pal_all(PALETTE);// generally before game loop (in main)
+  
+  writeText("This is\nJoshua Byron's\nfirst NES 'Game'!", 2, 2);
+  for(i = 1; i < 31; i++)
+  {
+    vram_adr(NTADR_A(i,floorLevel));
+    vram_put(floorTile);
+  }
+  
+  
+  player.act.x = 60;
+  player.act.y = 18*8;
+  //player.act.x = 3 *8;
+  //player.act.y = 16*8;
+  
+  player.act.dx = 1;
+  player.act.dy = 0;
+  player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
+  
+  player.act.alive = true;
+  player.act.moveSpeed = 2;
+  player.act.jumpSpeed = 3;
+  player.act.grounded = true;
+  
+  
+  for(i = 0; i < 1; i++)
+  {
+    Destructable brick;
+    brick.sprite = 0x0F;
+    brick.x = 100;
+    brick.y = 18*8 + 2;
+    brick.attribute = 1;
+    brick.alive = true;
+    destroybois[i] = brick;
+    //setting this value too
+    setGround(brick.x/8, brick.y/8, 0x03);
+  }
+  
+  //initalize brick spray
+  //randomizeParticle(singleBricks, brickSpeed, brick.act.x, brick.act.y);
   
   for( i = 0; i < SHADOW_SIZE; i++)
   {
@@ -398,8 +446,7 @@ void main(void) {
   }
   
   
-  //setting this value too
-  setGround(brick.act.x/8, brick.act.y/8, 0x03);
+  
   
   // enable PPU rendeing (turn on screen)
   ppu_on_all();
@@ -407,51 +454,72 @@ void main(void) {
   //always updates @ 60fps
   while (1)
   {
-    
-    
-    
     char pad_result= pad_poll(0) | pad_poll(1);
     
     //game loop
     char cur_oam = 0; // max of 64 sprites on screen @ once w/out flickering
     char res;
     
-    player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6);
+    res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, 1);
+    if(res == 0)
+    {
+    	player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6) ;
+    }
+    else
+    {
+      player.act.dx = 0;
+    }
+    
+    {
+      /*
+      vram_adr(NTADR_A((player.act.x/8) +lastFacingRight, ((player.act.y)/8)+1));
+      vram_put(floorTile+1);
+      vram_adr(NTADR_A((player.act.x/8) +lastFacingRight, ((player.act.y)/8)));
+      vram_put(floorTile+1);
+      
+      vram_adr(NTADR_A((player.act.x/8) +(lastFacingRight*3 - 1), ((player.act.y)/8)+1));
+      vram_put(floorTile+1);
+      vram_adr(NTADR_A((player.act.x/8) +(lastFacingRight*3 - 1), ((player.act.y)/8)));
+      vram_put(floorTile+1);
+      vram_adr(NTADR_A(0, 0));
+      */
+    }
+    {
+      /*
+      char dx[32];
+      sprintf(dx, "in front: %d", res);
+      updateScreen(2, 7, dx, 32);
+      
+      sprintf(dx, "%d %d       ", (player.act.x/8) +(lastFacingRight*3 - 1), ((player.act.y)/8));
+      updateScreen(2, 8, dx, 32);
+      sprintf(dx, "%d %d       ", (player.act.x/8) +lastFacingRight, ((player.act.y)/8));
+      updateScreen(2, 9, dx, 32);
+      sprintf(dx, "%d %d       ", brick.act.x/8, brick.act.y/8);
+      updateScreen(2, 10, dx, 32);
+      */
+    }
     
     if((pad_result&0x08)>>3 && numActive == 0)
     {
       //pressing enter respawns brick...
-      brick.act.alive = true;
-      setGround(brick.act.x/8, brick.act.y/8, 0x03);
+      for(i = 0; i < 1; i++)
+      {
+        destroybois[i].alive = true;
+        //setting this value too
+        setGround(destroybois[i].x/8, destroybois[i].y/8, 0x03);
+      }
     }
     
     {
-      char res2;
+      //char res2;
       int x1 = (player.act.x/8);
       int x2 = ((player.act.x + player.act.dx * player.act.moveSpeed)/8);
       int y1 = (player.act.y/8) + 2;
       int y2 = ((player.act.y + player.act.dy * player.act.jumpSpeed)/8)+2;
       
       
-      
-      res = checkGround(x1, y1, 1);
-      
-      while(x1 != x2 && y1 != y2)
-      {
-        if(x1 != x2)
-        {
-          x1 += player.act.dx;
-        }
-        if(y1 != y2)
-        {
-          y1 += player.act.dy;
-        }
-        res2 = checkGround(x1, y1, 1);
-        res = res | res2;
-      }
-      
       res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 1); // 1 = ground, 0 = breakable
-      
+      //res = res | checkGround((player.act.x/8)+1, ((player.act.y)/8)+2, 1);
       //res2 = checkGround(((player.act.x + player.act.dx * player.act.moveSpeed)/8), ((player.act.y + player.act.dy * player.act.jumpSpeed)/8)+2, 1);
       //res = res | res2;
     }
@@ -461,7 +529,7 @@ void main(void) {
     //shows the player's input
       char dx[32];
       //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "shadow chunk: %d", res);
+      sprintf(dx, "grounded: %d", res);
       updateScreen(2, 6, dx, 32);
     }
     
@@ -572,21 +640,57 @@ void main(void) {
     }
     */
     
-    if(brick.act.alive == true)
+    //if(brick.act.alive == true)
+    for(i = 0; i < 1; i++)
     {
-      cur_oam = oam_spr(brick.act.x, brick.act.y, brick.sprite ,brick.act.attribute, cur_oam);
-      res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 0);
-      
-      if((res == 1 || rectanglesHit(player.act.x, player.act.y, 16, 16, brick.act.x, brick.act.y, 8, 8)) && pad_result & 0x04)
+      if(destroybois[i].alive)
       {
-        setGround(brick.act.x/8, brick.act.y/8, 0);
-        brick.act.alive = false;
+        cur_oam = oam_spr(destroybois[i].x, destroybois[i].y, destroybois[i].sprite , destroybois[i].attribute, cur_oam);
+      }
+      //res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 0) | searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
+      //res checks bellow and in the facing dir of the player...
+      res = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
+      {
+          char dx[32];
+          //sprintf(dx, "%d", player.act.dx);
+          sprintf(dx, "break block: %d", res);
+          updateScreen(2, 7, dx, 32);
+      }
+      //if((res == 1 || rectanglesHit(player.act.x, player.act.y, 16, 16, brick.act.x, brick.act.y, 8, 8)) && pad_result & 0x04)
+      if((res != 0) && pad_result&0x04)
+      {
+        
+        int itemX, itemY;
+        if(res == 1)
+        {
+          itemX = (player.act.x/8)+lastFacingRight;
+          itemY = ((player.act.y)/8);
+        }
+        
+        /*
+        {
+          char dx[32];
+          //sprintf(dx, "%d", player.act.dx);
+          sprintf(dx, "block: %d %d", brick.act.x/8, brick.act.y/8);
+          updateScreen(2, 8, dx, 32);
+          
+          sprintf(dx, "player: %d, %d", itemX, itemY);
+          updateScreen(2, 9, dx, 32);
+        }
+        */
+        
+        
+        setGround(itemX, itemY, 0);
+        destroybois[i].alive = false;
+        
 	numActive = NUM_BRICKS;
         for(i = 0; i < numActive; i++)
         {
           singleBricks[i].lifetime = brickLifetime;
-          singleBricks[i].x = brick.act.x+8;
-          singleBricks[i].y = brick.act.y+8;
+          singleBricks[i].x = destroybois[i].x+8;
+          singleBricks[i].y = destroybois[i].y+8;
+          
+          randomizeParticle(singleBricks, brickSpeed, destroybois[i].x, destroybois[i].y);
         }
         
       }
