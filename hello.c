@@ -31,11 +31,12 @@ unsigned char name[]={\
 #define NES_MIRRORING 1("vertical", 0 = "horizontal")
 //Nametable A starts at 0x2000, Nametable B starts at 0x2400
 
-#define WORLD_WIDTH = 240*2
-#define WORLD_HEIGHT = 256;
+#define WORLD_WIDTH 240*2
+#define WORLD_HEIGHT 256
 
 //1920 bits, 1 for am i ground, 1 for am i breakable...
-#define SHADOW_SIZE 240
+//#define SHADOW_SIZE 240
+#define SHADOW_SIZE 256 //some buffer (of 2 columns)
 char shadow[SHADOW_SIZE];
 
 byte outsideHelper; //used for debugging
@@ -57,7 +58,6 @@ void writeBinary(int x, int y, byte value)
   sprintf(dx, "%d %d %d %d %d %d %d %d", (value&0x80)>>7, (value&0x40)>>6, (value&0x20) >>5, (value&0x10)>>4, (value&0x08)>>3, (value&0x04)>>2, (value&0x02)>>1, value&0x01);
   updateScreen(x, y, dx, 16);
 }
-
 
 void setGround(int x, int y, byte placeMe)
 {
@@ -102,6 +102,10 @@ short checkGround(int x, int y, byte val)
   return value;
 }
 
+void shiftshadow(int deltaX)
+{
+  int numTiles = deltaX/8;
+}
 
 
 byte getchar_vram(byte x, byte y) {
@@ -635,6 +639,10 @@ void main(void) {
       if(player.act.x + deltaX > 256/2)
       {
         world_x += deltaX;
+        
+        //we need to shift the shadow!
+        
+        shiftshadow(deltaX);
       }
       else
       {
@@ -645,7 +653,10 @@ void main(void) {
 
       //max val is 512
       scroll(world_x, world_y);
+      
+      
     }
+    
     
     
     //this makes it wait one frame in between updates
