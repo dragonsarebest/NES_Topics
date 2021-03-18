@@ -34,9 +34,65 @@ unsigned char name[]={\
 #define WORLD_WIDTH = 256*2
 #define WORLD_HEIGHT = 256;
 
-int world_x = 0;
-int world_y = 0;
+//1920 bits, 1 for am i ground, 1 for am i breakable...
+char shadow[240];
 
+void setGround(int x, int y, byte placeMe, byte val)
+{
+  //val = 0 if you want the 1st value and  = 1 if you want the 2nd
+  int bytenum;
+  int remainder;
+  byte mask = 0xFF;
+  int bitNum = (y*30*2 + x*2);
+  bytenum = bitNum >> 3;//same as dividing by 8...
+  remainder = (bitNum & 0x07) + val; //the lost 3 bits from divison
+  //go remainder number of bits into shadow
+  
+  //(orignalNumber & 0x??) | (byteToPlace  << remainder);
+  //remainder is 0->8
+  mask = mask ^ (1 >> (8-remainder));
+  shadow[bytenum] = shadow[bytenum] & mask | placeMe >> (8-remainder);
+}
+
+short checkGround(int x, int y, byte val)
+{
+  //val = 0 if you want the 1st value and  = 1 if you want the 2nd
+  //32 columns, 30 rows
+  int bytenum;
+  int remainder;
+  int value;
+  int bitNum = (y*30*2 + x*2);
+  bytenum = bitNum >> 3;//same as dividing by 8...
+  remainder = (bitNum & 0x07) + val; //the lost 3 bits from divison
+  //go remainder number of bits into shadow
+  value = ((shadow[bytenum] << remainder) & 0x80) << 7;
+  
+  return value;
+}
+
+void updateScreen(unsigned char column, unsigned char row, char * buffer, unsigned char num_bytes)
+{
+  vrambuf_clear();
+  set_vram_update(updbuf);
+  vrambuf_put(NTADR_A(column, row), buffer, num_bytes);
+  vrambuf_flush();
+}
+
+byte getchar_vram(byte x, byte y) {
+  // compute VRAM read address
+  word addr = NTADR_A(x,y);
+  // result goes into rd
+  byte rd;
+  // wait for VBLANK to start
+  ppu_wait_nmi();
+  // set vram address and read byte into rd
+  vram_adr(addr);
+  vram_read(&rd, 1);
+  // scroll registers are corrupt
+  // fix by setting vram address
+  vram_adr(0x0);
+  return rd;
+}
 
 void updateMetaSprite(unsigned char attribute, unsigned char * meta)
 {
@@ -84,6 +140,19 @@ void updateMetaSprite(unsigned char attribute, unsigned char * meta)
   }
 }
 
+typedef struct Particles
+{
+  unsigned char x;
+  unsigned char y;
+  int dx;
+  int dy;
+  unsigned char attribute;
+  short lifetime;
+  
+  unsigned char sprite;
+}Particles;
+
+
 typedef struct Actor
 {
   unsigned char x;
@@ -95,8 +164,6 @@ typedef struct Actor
   unsigned char moveSpeed;
   unsigned char jumpSpeed;
   char jumpTimer;
-  char maxlife;
-  char lifetime;
   char grounded;
 } Actor;
 
@@ -146,45 +213,28 @@ unsigned int getAbs(int n)
     return ((n + mask) ^ mask); 
 } 
 
-int doIHit(int x, int y, int x2, int y2, int hitXMin, int hitYMin)
+short rectanglesHit(int x, int y, int width, int height, int x2, int y2, int width2, int height2)
 {
-  if(getAbs(x - x2) <= hitXMin && getAbs(y - y2) <= hitYMin)
-  {
+  if(!(x ^ x2) && !(y ^ y2))
     return true;
-  }
-  return false;
-}
+  //If one rectangle is on left side of other 
+  if (x > x2+width2 || x2 > x+width) 
+    return false; 
 
-void updateScreen(unsigned char column, unsigned char row, char * buffer, unsigned char num_bytes)
-{
-  vrambuf_clear();
-  set_vram_update(updbuf);
-  vrambuf_put(NTADR_A(column, row), buffer, num_bytes);
-  vrambuf_flush();
-}
-
-byte getchar_vram(byte x, byte y) {
-  // compute VRAM read address
-  word addr = NTADR_A(x,y);
-  // result goes into rd
-  byte rd;
-  // wait for VBLANK to start
-  ppu_wait_nmi();
-  // set vram address and read byte into rd
-  vram_adr(addr);
-  vram_read(&rd, 1);
-  // scroll registers are corrupt
-  // fix by setting vram address
-  vram_adr(0x0);
-  return rd;
+  // If one rectangle is above other 
+  if (y > y2+height2 || y2 < y+height) 
+    return false; 
+  return true; 
 }
 
 //define variables here
+
+
+int world_x = 0;
+int world_y = 0;
+
 DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
 MetaActor player;
-
-DEF_METASPRITE_2x2(DoorMetaSprite, 0xC4, 0);
-MetaActor Door;
 
 SpriteActor brick;
 
@@ -210,17 +260,21 @@ char jumpTable[MAX_JUMP] =
   -8, -4, -2, -1, 0, 1, 2, 4, 8
 };
 
+#define NUM_BRICKS 16
+
 // main function, run after console reset
 void main(void) {
   
   unsigned char floorLevel = 20;
   unsigned char floorTile = 0xc0;
+  
   byte lastFacingRight = true;
   byte playerInAir = false;
   
-  SpriteActor singleBricks[32];
+  Particles singleBricks[NUM_BRICKS];
   unsigned char numActive = 0;
-  unsigned char numBricks = 16;
+  short brickSpeed = 5;
+  short brickLifetime = 10;
 
   unsigned int i = 0, j = 0;
       
@@ -233,21 +287,13 @@ void main(void) {
     vram_put(floorTile);
   }
   
-  Door.act.x = 29*8;
-  Door.act.y = 18*8;
-  Door.act.dx = 0;
-  Door.act.dy = 0;
-  Door.act.attribute = 1 | (1 << 5) | (0 << 6) | (0 << 7);
-  updateMetaSprite(Door.act.attribute, DoorMetaSprite);
-  Door.act.alive = true;
-  
   
   player.act.x = 60;
-  player.act.y = Door.act.y;
+  player.act.y = 18*8;
   player.act.dx = 1;
   player.act.dy = 0;
   player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
-  updateMetaSprite(player.act.attribute, PlayerMetaSprite);
+  
   player.act.alive = true;
   player.act.moveSpeed = 5;
   player.act.jumpSpeed = 3;
@@ -255,44 +301,62 @@ void main(void) {
   
   brick.sprite = 0x0F;
   brick.act.x = 30;
-  brick.act.y = Door.act.y;
+  brick.act.y = 18*8;
   brick.act.attribute = 1;
   brick.act.alive = true;
   
   //initalize brick spray
-  for(i = 0; i < numBricks; i++)
+  for(i = 0; i < NUM_BRICKS; i++)
   {
-    SpriteActor bck;
-    bck.sprite = 0x80;
-    bck.act.x = brick.act.x + 2 * (i%4);
-    bck.act.y = brick.act.y + i%8;
-    bck.act.attribute = 1+i%2;
-    bck.act.alive = true;
-    bck.act.maxlife = 20;
-    bck.act.lifetime = 0;
-    bck.act.moveSpeed = 5;
-    if(rand()*50 > 25)
-    {
-      bck.act.dx = -1 * bck.act.moveSpeed;
-    }
-    else
-    {
-      bck.act.dx = 1 * bck.act.moveSpeed;
-    }
+    Particles bck;
+    int temp;
+    bck.x = brick.act.x + 2 * (i%4);
+    bck.y = brick.act.y + i%8;
+    bck.attribute = 1+i%2;
+    bck.lifetime = 20;
     
-    if(rand()*50 > 25)
+    temp = rand()%brickSpeed*2;
+    if(temp > brickSpeed)
     {
-      bck.act.dy = -1 * bck.act.moveSpeed;
+      temp = - temp%brickSpeed;
+    }
+    bck.dx = temp;
+    temp = rand()%brickSpeed*2;
+    if(temp > brickSpeed)
+    {
+      temp = - temp%brickSpeed;
+    }
+    bck.dy= temp;
+    
+    
+    temp = rand()%brickSpeed;
+    if(temp > brickSpeed/2)
+    {
+      bck.sprite = 0x80;
     }
     else
     {
-      bck.act.dy = 1 * bck.act.moveSpeed;
+      bck.sprite = 0x81;
     }
     
     singleBricks[i] = bck;
   }
   
   
+  
+  //set shadow
+  for(i = 0; i < 30; i++)
+  {
+    //32 columns, 30 rows
+    for(j = 0; j < 32; j++)
+    {
+      //0000 0010 just ground 0x02
+      //0000 0011 ground and breakable 0x03
+      //0000 0001 just breakable, not ground 0x01
+      
+      setGround(i, j, 0x02, 0);
+    }
+  }
   
   // enable PPU rendeing (turn on screen)
   ppu_on_all();
@@ -305,12 +369,7 @@ void main(void) {
     //game loop
     char cur_oam = 0; // max of 64 sprites on screen @ once w/out flickering
     char res;
-    //char res2;
-    int temp;
     player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6);
-    //player.act.dy = ((pad_result & 0x20) >> 5) + -1 * ((pad_result & 0x10) >> 4);
-    //player.act.dy = -1 * (player.act.grounded & ((pad_result & 0x10) >> 4));
-    
     
     if((pad_result&0x08)>>3 && numActive == 0)
     {
@@ -321,8 +380,6 @@ void main(void) {
     //if there is a grounded block below player then the player is also grounded
     
     res = getchar_vram((player.act.x/8), ((player.act.y)/8)+2);
-    //res2 = getchar_vram(((player.act.x + player.act.dx*player.act.moveSpeed)/8), ((player.act.y + player.act.dy*player.act.jumpSpeed)/8 +2));
-    //res = (res & 0xF0) > (startOfground & 0xF0) || (res2 & 0xF0) > (startOfground & 0xF0);
     res = (res & 0xF0) > (startOfground & 0xF0);
       
     if( res)
@@ -344,61 +401,46 @@ void main(void) {
       updateScreen(2, 5, dx, 12);
     }
     
-    
-    {
-      char dx[16];
-      sprintf(dx, "grounded %d", player.act.grounded);
-      updateScreen(2, 6, dx, 12);
-    }
-    
     //char temp = (player.act.dx == -1);
-    temp = -1;
     if((pad_result & 0x80)>>7 && lastFacingRight == false)
     {
-      temp = 0;
       lastFacingRight = true;
     }
     else
     {
       if((pad_result & 0x40)>>6 && lastFacingRight)
       {
-        temp = 1;
         lastFacingRight = false;
       }
     }
-    if(temp != -1)
     {
-    	player.act.attribute = (player.act.attribute & 0xBF) | (temp  << 6);
+    	player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
     	updateMetaSprite(player.act.attribute, PlayerMetaSprite);
     }
     
     cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
-    cur_oam = oam_meta_spr(Door.act.x, Door.act.y, cur_oam, DoorMetaSprite);
 
     
-    for(i = 0; i < numActive; )
+    if(numActive)
+    for(i = 0; i < NUM_BRICKS; i++)
     {
-      if(singleBricks[i].act.alive == true)
+      if(singleBricks[i].lifetime > 0)
       {
-        cur_oam = oam_spr(singleBricks[i].act.x, singleBricks[i].act.y, singleBricks[i].sprite ,singleBricks[i].act.attribute, cur_oam);
+        cur_oam = oam_spr(singleBricks[i].x, singleBricks[i].y, singleBricks[i].sprite ,singleBricks[i].attribute, cur_oam);
         //if(walk_wait == 0)
         {
-          singleBricks[i].act.x = singleBricks[i].act.x + singleBricks[i].act.dx;
-          singleBricks[i].act.y = singleBricks[i].act.y + singleBricks[i].act.dy;
-          singleBricks[i].act.lifetime += 1;
+          singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx;
+          singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy;
 
-          if(singleBricks[i].act.lifetime > singleBricks[i].act.maxlife)
+          
+          if(singleBricks[i].lifetime != 1)
           {
-            SpriteActor trmp;
-            singleBricks[i].act.alive = false;
-            trmp = singleBricks[i];
-            //swap this dead one with an alive one...
-            singleBricks[i] = singleBricks[--numActive];
-            singleBricks[numActive] = trmp;
+            singleBricks[i].lifetime--;
           }
           else
           {
-            i++;
+            singleBricks[i].lifetime = 0;
+            numActive--;
           }
 
         }
@@ -409,16 +451,16 @@ void main(void) {
     if(brick.act.alive == true)
     {
       cur_oam = oam_spr(brick.act.x, brick.act.y, brick.sprite ,brick.act.attribute, cur_oam);
-      if(doIHit(player.act.x, player.act.y, brick.act.x+8, brick.act.y, 8, 8))
+      //&& pad_res&0x
+      if(rectanglesHit(player.act.x, player.act.y, 16, 16, brick.act.x, brick.act.y, 8, 8) )
       {
         brick.act.alive = false;
-	numActive = 16;
+	numActive = NUM_BRICKS;
         for(i = 0; i < numActive; i++)
         {
-          singleBricks[i].act.lifetime = 0;
-          singleBricks[i].act.alive = true;
-          singleBricks[i].act.x = brick.act.x+8;
-          singleBricks[i].act.y = brick.act.y+8;
+          singleBricks[i].lifetime = brickLifetime;
+          singleBricks[i].x = brick.act.x+8;
+          singleBricks[i].y = brick.act.y+8;
         }
         
       }
@@ -428,6 +470,7 @@ void main(void) {
     
     if(player.act.grounded && playerInAir)
     {
+      //means we hit the ground again
       playerInAir = false;
       player.act.dy = 0;
       player.act.jumpTimer = 0;
@@ -471,6 +514,8 @@ void main(void) {
       {
         player.act.x += deltaX;
       }
+      
+      player.act.y += deltaY;
 
       //max val is 512
       scroll(world_x, world_y);
