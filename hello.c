@@ -99,6 +99,8 @@ int world_y = 0;
 DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
 MetaActor player;
 
+DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xE0, 0);
+
 char PALETTE[32] = 
 {
   0x03, // screen color
@@ -383,6 +385,8 @@ void main(void) {
   short brickLifetime = 10;
 
   unsigned int i = 0, j = 0;
+  
+  char debugCheck = true;
       
   pal_all(PALETTE);// generally before game loop (in main)
   
@@ -401,6 +405,10 @@ void main(void) {
   
   player.act.x = 60;
   player.act.y = 18*8;
+  
+  player.act.x = 8*12;
+  player.act.y = 18*7 + 2;
+  //on top of brick block...
   
   player.act.dx = 1;
   player.act.dy = 0;
@@ -454,13 +462,13 @@ void main(void) {
   //always updates @ 60fps
   while (1)
   {
-    
+    byte run = 0;
     char pad_result= pad_poll(0) | pad_poll(1);
     
     //game loop
     char cur_oam = 0; // max of 64 sprites on screen @ once w/out flickering
     char res;
-    int res2;
+    char res2;
     
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, -1);
     if(res == 0)
@@ -489,29 +497,40 @@ void main(void) {
     
     {
       res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+2, 1);
-      res2 = -1;
+      res2 = res;
       
       if(player.act.dy > 0 && playerInAir)
       {
-        res2 = res | checkGround((player.act.x/8), ((player.act.y)/8)+3, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+3, 1);
-        
+        res = res | checkGround((player.act.x/8), ((player.act.y)/8)+3, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+3, 1);
+        if(player.act.dy * player.act.jumpSpeed >= 8)
+        {
+          res = res | checkGround((player.act.x/8), ((player.act.y)/8)+4, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+4, 1);
+        }
+      }
+      
+    }
+    
+    
+    if(debugCheck)
+    {
+      if(res != 0)
+      {
+        player.act.grounded = true;
+      }
+      else
+      {
+        player.act.grounded = false;
+        if(player.act.grounded == false && playerInAir == false)
+        {
+          //start falling!
+          player.act.jumpTimer = MAX_JUMP/2;
+          playerInAir = true;
+        }
       }
     }
     
-    if(res != 0)
-    {
-      player.act.grounded = true;
-    }
-    else
-    {
-      player.act.grounded = false;
-      if(player.act.grounded == false && playerInAir == false)
-      {
-        //start falling!
-        player.act.jumpTimer = MAX_JUMP/2;
-        playerInAir = true;
-      }
-    }
+    outsideHelper = res;
+    outsideHelper2 = player.act.grounded;
 
 
     //char temp = (player.act.dx == -1);
@@ -529,10 +548,10 @@ void main(void) {
     {
     	player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
     	updateMetaSprite(player.act.attribute, PlayerMetaSprite);
+      	updateMetaSprite(player.act.attribute, PlayerMetaSprite_Run);
     }
     
-    cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
-
+    
     
     if(numActive)
     for(i = 0; i < NUM_BRICKS; i++)
@@ -566,30 +585,30 @@ void main(void) {
 
       //res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 0) | searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
       //res checks bellow and in the facing dir of the player...
-      res = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
+      char breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
       
       //if((res == 1 || rectanglesHit(player.act.x, player.act.y, 16, 16, brick.act.x, brick.act.y, 8, 8)) && pad_result & 0x04)
-      if((res != 0) && pad_result&0x04)
+      if((breakBlock != 0) && pad_result&0x04)
       {
         
         int itemX, itemY;
         //1, 2, 4, 8
-        if(res == 1)
+        if(breakBlock == 1)
         {
           itemX = (player.act.x/8)+lastFacingRight;
           itemY = ((player.act.y)/8);
         }
-        if(res == 2)
+        if(breakBlock == 2)
         {
           itemX = (player.act.x/8)+lastFacingRight;
           itemY = ((player.act.y)/8)+1;
         }
-        if(res == 4)
+        if(breakBlock == 4)
         {
           itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
           itemY = ((player.act.y)/8);
         }
-        if(res == 8)
+        if(breakBlock == 8)
         {
           itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
           itemY = ((player.act.y)/8)+1;
@@ -634,19 +653,46 @@ void main(void) {
       }
     }
     
-    if(res2 > 0 && res == 0)
+    
+    if(player.act.grounded && playerInAir && debugCheck)
     {
-      //means we hit the ground again
-      playerInAir = false;
+      int itemX, itemY;
+      //1, 2, 4, 8
+      if(res == 1)
+      {
+        itemX = (player.act.x/8)+lastFacingRight;
+        itemY = ((player.act.y)/8);
+      }
+      if(res == 2)
+      {
+        itemX = (player.act.x/8)+lastFacingRight;
+        itemY = ((player.act.y)/8)+1;
+      }
+      if(res == 4)
+      {
+        itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
+        itemY = ((player.act.y)/8);
+      }
+      if(res == 8)
+      {
+        itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
+        itemY = ((player.act.y)/8)+1;
+      }
+      player.act.jumpTimer = 0;
+      if(!res2)
+      {
+        player.act.y = (itemY+1)*8;
+      }
+      else
+      {
+        player.act.y = (itemY)*8;
+      }
       player.act.dy = 0;
       
-      player.act.jumpTimer = 0;
-      //player.act.y = ((player.act.y + 7) & (-8));
-      //player.act.grounded = true;
+      playerInAir = false;
+      player.act.grounded = false;
+      debugCheck = false;
       
-      //player.act.y -= player.act.y % 8;
-      
-      //player.act.y = ((player.act.y / 8)+1) * 8;
     }
     
     if(player.act.jumpTimer != MAX_JUMP-1 && !playerInAir)
@@ -682,7 +728,7 @@ void main(void) {
     
     {
       char dx[32];
-      sprintf(dx, "grounded: %d", res);
+      sprintf(dx, "grounded: %d", player.act.grounded);
       updateScreen(2, 6, dx, 32);
     }
     {
@@ -717,6 +763,8 @@ void main(void) {
     }
     
     
+    
+    //scrolling
     {
       int deltaX = 0;
       int deltaY = 0;
@@ -737,9 +785,10 @@ void main(void) {
         player.act.x += deltaX;
       }
       */
-      player.act.x += deltaX;
-      
-      player.act.y += deltaY;
+      {
+        player.act.x += deltaX;
+        player.act.y += deltaY;
+      }
 
       //max val is 512
       scroll(world_x, world_y);
@@ -747,14 +796,27 @@ void main(void) {
       
     }
     
-    feet.act.x = player.act.x;
-    feet.act.y = player.act.y + 8*2;
-    cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
+    if(run == 1 && player.act.grounded)
+    {
+      cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
+      run = 0;
+    }
+    else
+    {
+      cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
+    }
+    run++;
     
-    feet.act.x = player.act.x+8;
-    feet.act.y = player.act.y + 8*2;
-    cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
-    
+    if(debugCheck)
+    {
+      feet.act.x = player.act.x;
+      feet.act.y = player.act.y + 8*3;
+      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
+
+      feet.act.x = player.act.x+8;
+      feet.act.y = player.act.y + 8*3;
+      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
+    }
     //for(i = 0; i  < 10; i++)
     //{
     //  ppu_wait_frame();
