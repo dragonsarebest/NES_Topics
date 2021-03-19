@@ -460,6 +460,7 @@ void main(void) {
     //game loop
     char cur_oam = 0; // max of 64 sprites on screen @ once w/out flickering
     char res;
+    int res2;
     
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, -1);
     if(res == 0)
@@ -488,15 +489,14 @@ void main(void) {
     
     {
       res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+2, 1);
+      res2 = -1;
       
       if(player.act.dy > 0 && playerInAir)
       {
-        res = res | checkGround((player.act.x/8), ((player.act.y)/8)+3, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+3, 1);
+        res2 = res | checkGround((player.act.x/8), ((player.act.y)/8)+3, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+3, 1);
         
       }
     }
-    
-   
     
     if(res != 0)
     {
@@ -512,6 +512,7 @@ void main(void) {
         playerInAir = true;
       }
     }
+
 
     //char temp = (player.act.dx == -1);
     if((pad_result & 0x80)>>7 && lastFacingRight == false)
@@ -633,14 +634,18 @@ void main(void) {
       }
     }
     
-    if(player.act.grounded && playerInAir)
+    if(res2 > 0 && res == 0)
     {
       //means we hit the ground again
       playerInAir = false;
       player.act.dy = 0;
+      
       player.act.jumpTimer = 0;
       //player.act.y = ((player.act.y + 7) & (-8));
-      player.act.y += player.act.y % 8;
+      //player.act.grounded = true;
+      
+      //player.act.y -= player.act.y % 8;
+      
       //player.act.y = ((player.act.y / 8)+1) * 8;
     }
     
