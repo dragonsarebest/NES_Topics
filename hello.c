@@ -99,7 +99,7 @@ int world_y = 0;
 DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
 MetaActor player;
 
-DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xE0, 0);
+DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xDC, 0);
 
 char PALETTE[32] = 
 {
@@ -373,6 +373,7 @@ void main(void) {
   
   byte lastFacingRight = true;
   byte playerInAir = false;
+  byte run = 0;
   
   //Destructable destroybois[32];
   Destructable brick;
@@ -462,13 +463,14 @@ void main(void) {
   //always updates @ 60fps
   while (1)
   {
-    byte run = 0;
+    
     char pad_result= pad_poll(0) | pad_poll(1);
     
     //game loop
     char cur_oam = 0; // max of 64 sprites on screen @ once w/out flickering
     char res;
     char res2;
+    char res3;
     
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, -1);
     if(res == 0)
@@ -502,6 +504,8 @@ void main(void) {
       if(player.act.dy > 0 && playerInAir)
       {
         res = res | checkGround((player.act.x/8), ((player.act.y)/8)+3, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+3, 1);
+        res3 = res;
+        
         if(player.act.dy * player.act.jumpSpeed >= 8)
         {
           res = res | checkGround((player.act.x/8), ((player.act.y)/8)+4, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+4, 1);
@@ -530,6 +534,7 @@ void main(void) {
     }
     
     outsideHelper = res;
+    outsideHelper3 = res3;
     outsideHelper2 = player.act.grounded;
 
 
@@ -679,19 +684,28 @@ void main(void) {
         itemY = ((player.act.y)/8)+1;
       }
       player.act.jumpTimer = 0;
-      if(!res2)
+      if(res3 == false && res == true)
       {
-        player.act.y = (itemY+1)*8;
+        //zoomin... will pass through two blocks in next tick if unstopped
+        player.act.y = (itemY+2)*8;
       }
       else
       {
-        player.act.y = (itemY)*8;
+        if(!res2)
+        {
+          //zoomin... will pass through one blocks in next tick if unstopped
+          player.act.y = (itemY+1)*8;
+        }
+        else
+        {
+          player.act.y = (itemY)*8;
+        }
       }
       player.act.dy = 0;
       
       playerInAir = false;
       player.act.grounded = false;
-      debugCheck = false;
+      //debugCheck = false;
       
     }
     
@@ -796,16 +810,24 @@ void main(void) {
       
     }
     
-    if(run == 1 && player.act.grounded)
+    if(player.act.dx != 0 && player.act.grounded)
     {
-      cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
-      run = 0;
+      if(run == 1)
+      {
+        cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
+        run = 0;
+      }
+      else
+      {
+        cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
+        run++;
+      }
     }
     else
     {
       cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
     }
-    run++;
+    
     
     if(debugCheck)
     {
