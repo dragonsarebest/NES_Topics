@@ -62,9 +62,8 @@ typedef struct Destructable
 {
   unsigned char x;
   unsigned char y;
-  unsigned char sprite;
   unsigned char alive;
-  unsigned char attribute;
+  unsigned char sprite;
 } Destructable;
 
 typedef struct Actor
@@ -116,10 +115,10 @@ char PALETTE[32] =
 
 char startOfground = 0x7f;
 
-#define MAX_JUMP 9
-char jumpTable[MAX_JUMP] = 
+#define MAX_JUMP 7
+int jumpTable[MAX_JUMP] = 
 {
-  -8, -4, -2, -1, 0, 1, 2, 4, 8
+  -4, -2, -1, 0, 1, 2, 4
 };
 
 #define NUM_BRICKS 16
@@ -307,11 +306,11 @@ byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte fac
   //if checking for collision = 1 .. look forward 1 less when lookung right
   //char infront = checkGround((x/8)+ (facingRight*3 -1), ((y)/8), groundOrBreak);
   //char infront2 = checkGround((x/8)+ (facingRight*3 -1), ((y)/8)+1, groundOrBreak);
-  char infront = checkGround((x/8)+facingRight, ((y)/8), groundOrBreak);
-  infront = infront + checkGround((x/8)+facingRight, ((y)/8)+1, groundOrBreak);
+  char infront = checkGround((x/8)+facingRight, ((y)/8), groundOrBreak)*1;
+  infront = infront + checkGround((x/8)+facingRight, ((y)/8)+1, groundOrBreak)*2;
   
-  infront = infront + checkGround((x/8)+(facingRight*3 - 1 - collision*facingRight), ((y)/8), groundOrBreak);
-  infront = infront + checkGround((x/8)+(facingRight*3 - 1 - collision*facingRight), ((y)/8)+1, groundOrBreak);
+  infront = infront + checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8), groundOrBreak)*4;
+  infront = infront + checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8)+1, groundOrBreak)*8;
   
   //outsideHelper = (x/8)+ (facingRight*3 -1);
   //outsideHelper = (x/8) +facingRight;
@@ -375,6 +374,7 @@ void main(void) {
   
   //Destructable destroybois[32];
   Destructable brick;
+  SpriteActor feet;
   
   Particles singleBricks[NUM_BRICKS];
   unsigned char numActive = 0;
@@ -386,13 +386,18 @@ void main(void) {
       
   pal_all(PALETTE);// generally before game loop (in main)
   
+  /*
   writeText("This is\nJoshua Byron's\nfirst NES 'Game'!", 2, 2);
+  */
   for(i = 1; i < 31; i++)
   {
     vram_adr(NTADR_A(i,floorLevel));
     vram_put(floorTile);
   }
   
+  feet.act.x = 0;
+  feet.act.y = 0;
+  feet.sprite = 0x0F;
   
   player.act.x = 60;
   player.act.y = 18*8;
@@ -409,11 +414,13 @@ void main(void) {
   
   brick.sprite = 0x0F;
   brick.x = 100;
-  brick.y = 18*8 + 2;
-  brick.attribute = 1;
+  brick.y = 18*8;
+  //brick.attribute = 1;
   brick.alive = true;
+  vram_adr(NTADR_A(brick.x/8, brick.y/8));
+  vram_put(brick.sprite);
   
-  setGround(brick.x/8, brick.y/8, 0x03);
+  
   
   
   for( i = 0; i < SHADOW_SIZE; i++)
@@ -438,21 +445,23 @@ void main(void) {
   }
   
   
+  setGround(brick.x/8, brick.y/8, 0x03);
   
-  
+  randomizeParticle(singleBricks, brickSpeed, brick.x, brick.y);
   // enable PPU rendeing (turn on screen)
   ppu_on_all();
 
   //always updates @ 60fps
   while (1)
   {
+    
     char pad_result= pad_poll(0) | pad_poll(1);
     
     //game loop
     char cur_oam = 0; // max of 64 sprites on screen @ once w/out flickering
     char res;
     
-    res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, 1);
+    res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, -1);
     if(res == 0)
     {
     	player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6) ;
@@ -462,121 +471,48 @@ void main(void) {
       player.act.dx = 0;
     }
     
-    {
-      /*
-      vram_adr(NTADR_A((player.act.x/8) +lastFacingRight, ((player.act.y)/8)+1));
-      vram_put(floorTile+1);
-      vram_adr(NTADR_A((player.act.x/8) +lastFacingRight, ((player.act.y)/8)));
-      vram_put(floorTile+1);
-      
-      vram_adr(NTADR_A((player.act.x/8) +(lastFacingRight*3 - 1), ((player.act.y)/8)+1));
-      vram_put(floorTile+1);
-      vram_adr(NTADR_A((player.act.x/8) +(lastFacingRight*3 - 1), ((player.act.y)/8)));
-      vram_put(floorTile+1);
-      vram_adr(NTADR_A(0, 0));
-      */
-    }
-    {
-      /*
-      char dx[32];
-      sprintf(dx, "in front: %d", res);
-      updateScreen(2, 7, dx, 32);
-      
-      sprintf(dx, "%d %d       ", (player.act.x/8) +(lastFacingRight*3 - 1), ((player.act.y)/8));
-      updateScreen(2, 8, dx, 32);
-      sprintf(dx, "%d %d       ", (player.act.x/8) +lastFacingRight, ((player.act.y)/8));
-      updateScreen(2, 9, dx, 32);
-      sprintf(dx, "%d %d       ", brick.act.x/8, brick.act.y/8);
-      updateScreen(2, 10, dx, 32);
-      */
-    }
-    
-    {
-      char dx[32];
-      //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "bricked: %d, %d", brick.x/8, brick.y/8);
-      updateScreen(2, 10, dx, 32);
-      sprintf(dx, "player: %d, %d   ", player.act.x/8, player.act.y/8);
-      updateScreen(2, 9, dx, 32);
-    }
-    
     if((pad_result&0x08)>>3 && numActive == 0)
     {
       //pressing enter respawns brick...
       for(i = 0; i < 1; i++)
       {
+        ppu_off();
+        vram_adr(NTADR_A(brick.x/8, brick.y/8));
+        vram_put(brick.sprite);
+        ppu_on_all();
+        
         brick.alive = true;
         setGround(brick.x/8, brick.y/8, 0x03);
       }
     }
     
     {
-      //char res2;
-      int x1 = (player.act.x/8);
-      int x2 = ((player.act.x + player.act.dx * player.act.moveSpeed)/8);
-      int y1 = (player.act.y/8) + 2;
-      int y2 = ((player.act.y + player.act.dy * player.act.jumpSpeed)/8)+2;
+      res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+2, 1);
       
-      
-      res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 1); // 1 = ground, 0 = breakable
+      if(player.act.dy > 0 && playerInAir)
+      {
+        res = res | checkGround((player.act.x/8), ((player.act.y)/8)+3, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+3, 1);
+        
+      }
     }
     
-    {
-    //right, left, down, up, select start, B, A
-    //shows the player's input
-      char dx[32];
-      //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "grounded: %d", res);
-      updateScreen(2, 6, dx, 32);
-    }
+   
     
-    if(res == 1)
+    if(res != 0)
     {
       player.act.grounded = true;
     }
     else
     {
       player.act.grounded = false;
-      
-      
-      //if(player.act.jumpTimer == 0)
+      if(player.act.grounded == false && playerInAir == false)
       {
         //start falling!
         player.act.jumpTimer = MAX_JUMP/2;
         playerInAir = true;
       }
-      
     }
-    
-    /*
-    //outsideHelper = checkGround(1, floorLevel, 0);
-    outsideHelper = shadow[(floorLevel*30*2 + 1*2) >> 3];
-    {
-      int bytenum;
-      int remainder;
-      int value;
-      int bitNum = (floorLevel*30*2 + 1*2);
-      bytenum = bitNum >> 3;//same as dividing by 8...
-      remainder = (bitNum & 0x07) + 1; //the lost 3 bits from divison
-      //go remainder number of bits into shadow
-      value = (shadow[bytenum] >> remainder) & 0x01;
-      
-      outsideHelper = value;
-    }
-    //outsideHelper = shadow[151];
-    outsideHelper2 = player.act.x/8;
-    outsideHelper3 = (player.act.y/8) + 2;
-    */
-    
-    {
-    //right, left, down, up, select start, B, A
-    //shows the player's input
-      char dx[16];
-      //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "%d %d %d %d %d %d %d %d", (pad_result&0x80)>>7, (pad_result&0x40)>>6, (pad_result&0x20) >>5, (pad_result&0x10)>>4, (pad_result&0x08)>>3, (pad_result&0x04)>>2, (pad_result&0x02)>>1, pad_result&0x01);
-      updateScreen(2, 5, dx, 16);
-    }
-    
+
     //char temp = (player.act.dx == -1);
     if((pad_result & 0x80)>>7 && lastFacingRight == false)
     {
@@ -623,68 +559,74 @@ void main(void) {
       }
     }
     
-    /*
-    {
-    //right, left, down, up, select start, B, A
-    //shows the player's input
-      char dx[16];
-      //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "%d %d", (player.act.x/8), ((player.act.y)/8)+2);
-      updateScreen(2, 7, dx, 16);
-      
-      sprintf(dx, "%d %d", brick.act.x/8, brick.act.y/8);
-      updateScreen(2, 8, dx, 16);
-    }
-    */
     
-    if(brick.alive == true)
     {
-      cur_oam = oam_spr(brick.x, brick.y, brick.sprite , brick.attribute, cur_oam);
+      //cur_oam = oam_spr(brick.x, brick.y, brick.sprite , brick.attribute, cur_oam);
 
-    //res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 0) | searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
+      //res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 0) | searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
       //res checks bellow and in the facing dir of the player...
       res = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
-      {
-          char dx[32];
-          //sprintf(dx, "%d", player.act.dx);
-          sprintf(dx, "break block: %d", res);
-          updateScreen(2, 7, dx, 32);
-      }
+      
       //if((res == 1 || rectanglesHit(player.act.x, player.act.y, 16, 16, brick.act.x, brick.act.y, 8, 8)) && pad_result & 0x04)
       if((res != 0) && pad_result&0x04)
       {
         
         int itemX, itemY;
+        //1, 2, 4, 8
         if(res == 1)
         {
           itemX = (player.act.x/8)+lastFacingRight;
           itemY = ((player.act.y)/8);
         }
-        
+        if(res == 2)
+        {
+          itemX = (player.act.x/8)+lastFacingRight;
+          itemY = ((player.act.y)/8)+1;
+        }
+        if(res == 4)
+        {
+          itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
+          itemY = ((player.act.y)/8);
+        }
+        if(res == 8)
+        {
+          itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
+          itemY = ((player.act.y)/8)+1;
+        }
         /*
+        
         {
           char dx[32];
           //sprintf(dx, "%d", player.act.dx);
-          sprintf(dx, "block: %d %d", brick.act.x/8, brick.act.y/8);
+          sprintf(dx, "block: %d %d", brick.x, brick.y);
           updateScreen(2, 8, dx, 32);
           
-          sprintf(dx, "player: %d, %d", itemX, itemY);
+          sprintf(dx, "estimatedPos: %d, %d", itemX*8, itemY*8);
           updateScreen(2, 9, dx, 32);
         }
         */
+        
         
         
         setGround(itemX, itemY, 0);
         //destroybois[i].alive = false;
         brick.alive = false;
         
+        //delete obj from background...
+        
+        ppu_off();
+        vram_adr(NTADR_A(itemX, itemY));
+        vram_put(0x00);
+        ppu_on_all();
+        
+        
 	numActive = NUM_BRICKS;
         for(i = 0; i < numActive; i++)
         {
           singleBricks[i].lifetime = brickLifetime;
-          singleBricks[i].x = brick.x+8;
-          singleBricks[i].y = brick.y+8;
-          randomizeParticle(singleBricks, brickSpeed, brick.x, brick.y);
+          singleBricks[i].x = brick.x-5;
+          singleBricks[i].y = brick.y;
+          //randomizeParticle(singleBricks, brickSpeed, brick.x, brick.y);
           
         }
         
@@ -697,33 +639,77 @@ void main(void) {
       playerInAir = false;
       player.act.dy = 0;
       player.act.jumpTimer = 0;
+      //player.act.y = ((player.act.y + 7) & (-8));
+      player.act.y += player.act.y % 8;
+      //player.act.y = ((player.act.y / 8)+1) * 8;
     }
     
-    if(player.act.jumpTimer == 0)
+    if(player.act.jumpTimer != MAX_JUMP-1 && !playerInAir)
     {
       if(player.act.grounded == true && ((pad_result & 0x10) >> 4))
       {
         //if grounded and you try to jump...
-        player.act.jumpTimer = MAX_JUMP;
-        player.act.dy = jumpTable[MAX_JUMP-player.act.jumpTimer];
-        player.act.jumpTimer--;
+        player.act.jumpTimer = 0;
+        player.act.dy = jumpTable[player.act.jumpTimer];
+        player.act.jumpTimer++;
 	playerInAir = true;
       }
 
     }
 
-    if(playerInAir)
+    if(playerInAir && !player.act.grounded)
     {
       //going up or down
-      player.act.dy = jumpTable[MAX_JUMP-player.act.jumpTimer];
-      if(player.act.jumpTimer != 0)
-        player.act.jumpTimer--;
-
+      player.act.dy = jumpTable[player.act.jumpTimer];
+      if(player.act.jumpTimer != MAX_JUMP-1)
+        player.act.jumpTimer++;
     }
-
+     
     
     player.act.x += player.act.dx * player.act.moveSpeed;
     player.act.y += player.act.dy * player.act.jumpSpeed;
+    
+    //player.act.x = 12*8;
+    //player.act.y = 16*8;
+    
+    
+    //debug
+    
+    {
+      char dx[32];
+      sprintf(dx, "grounded: %d", res);
+      updateScreen(2, 6, dx, 32);
+    }
+    {
+    //right, left, down, up, select start, B, A
+    //shows the player's input
+      char dx[16];
+      //sprintf(dx, "%d", player.act.dx);
+      sprintf(dx, "%d %d %d %d %d %d %d %d", (pad_result&0x80)>>7, (pad_result&0x40)>>6, (pad_result&0x20) >>5, (pad_result&0x10)>>4, (pad_result&0x08)>>3, (pad_result&0x04)>>2, (pad_result&0x02)>>1, pad_result&0x01);
+      updateScreen(2, 5, dx, 16);
+    }
+    {
+      char dx[32];
+      sprintf(dx, "speed: %d :: jump %d", player.act.dy, player.act.jumpTimer);
+      updateScreen(2, 11, dx, 32);
+      //for(i = 0; i < 30; i++){ppu_wait_frame();}
+    }
+    
+    {
+      char dx[32];
+      //sprintf(dx, "%d", player.act.dx);
+      sprintf(dx, "bricked: %d, %d", brick.x, brick.y);
+      updateScreen(2, 10, dx, 32);
+      sprintf(dx, "player: %d, %d   ", player.act.x, player.act.y);
+      updateScreen(2, 9, dx, 32);
+    }
+    
+    {
+      char dx[32];
+      //sprintf(dx, "%d", player.act.dx);
+      sprintf(dx, "break block: %d", res);
+      updateScreen(2, 7, dx, 32);
+    }
     
     
     {
@@ -732,6 +718,7 @@ void main(void) {
       deltaX = player.act.dx * player.act.moveSpeed;
       deltaY = player.act.dy * player.act.jumpSpeed;
       
+      /*
       if(player.act.x + deltaX > 256/2)
       {
         world_x += deltaX;
@@ -744,6 +731,8 @@ void main(void) {
       {
         player.act.x += deltaX;
       }
+      */
+      player.act.x += deltaX;
       
       player.act.y += deltaY;
 
@@ -753,7 +742,18 @@ void main(void) {
       
     }
     
+    feet.act.x = player.act.x;
+    feet.act.y = player.act.y + 8*2;
+    cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
     
+    feet.act.x = player.act.x+8;
+    feet.act.y = player.act.y + 8*2;
+    cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
+    
+    //for(i = 0; i  < 10; i++)
+    //{
+    //  ppu_wait_frame();
+    //}
     
     //this makes it wait one frame in between updates
     ppu_wait_frame();
