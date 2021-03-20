@@ -39,6 +39,14 @@ unsigned char name[]={\
 #define SHADOW_SIZE 240 // 30 columns, 32 rows
 char shadow[SHADOW_SIZE];
 
+//newDataColumn has 32 bytes
+char newDataColumn[32];
+//newDataRow has 30 bytes
+char newDataRow[30];
+
+int shadowWorldX, shadowWorldY;
+  
+
 byte outsideHelper; //used for debugging
 byte outsideHelper2;
 byte outsideHelper3;
@@ -144,10 +152,8 @@ void writeBinary(unsigned char x, unsigned char y, byte value)
 }
 
 
-void scrollShadoe(int deltaX, int deltaY, char * newDataColumn, char * newDataRow)
+void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRow)
 {
-  //deltaX should be a power of 2, greater than 0...
-  //deltaY
   //newDataColumn has 32 bytes
   //newDataRow has 30 bytes
   
@@ -159,119 +165,148 @@ void scrollShadoe(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
   char * pos = shadow;
   int i = 0;
   int j = 0;
-  
-  int dataPos = 0;
-  
-  //dont fetch new data, just scroll
-  
-  int numBytes = deltaX >> 3; //number of full bytes we need to move, same as dividing by 8
-  int remainder = deltaX & 0x07; //gets the remainder, same as % by 8
   char leftover = 0;
   char old_leftover = 0;
-
-  for(i = 0; i < 32; i++)
+  
+  int numTiles_1 = deltaX >> 3; //number of tiles we need to move!
+  int numBytes = deltaX >> 2; //divide number by 4, or shift twice since we have 4 tiles per byte
+  int remainder = numTiles_1 & 0x07; // get the last 3 bits
+  
+  shadowWorldX += remainder & 0x01;
+  remainder = (remainder & 0x0E) + shadowWorldX/2;
+  shadowWorldX = shadowWorldX % 2;
+  //only want remainder to be powers of 2
+  
+  
+  if(deltaY != 0)
   {
-    int startOfRow = i*30;
     
-    if(deltaX != 0)
+    if(deltaY > 0)
     {
-      //SHIFTING X FIRST
-      if(deltaX > 0)
+      //move down, shift up
+      for(i = 31; i >= 0; i--)
       {
-        //shift left move right
+        //bottom = bottom-numtiles
         for(j = 0; j < 30; j++)
         {
-          if(j == 29)
+          if(i <= numTiles_1)
           {
-            shadow[startOfRow + j] = 0;
+            shadow[i*30 + j] = newDataRow[j];
           }
           else
           {
-            shadow[startOfRow + j] = shadow[startOfRow + j + 1];
+            shadow[i*30 + j] = shadow[(i-numTiles_1)*30 + j ];
           }
-        }
-        //we've moved the porpper num of bytes... now we need to move bits!
-        
-        
-        //old_leftover = 0;
-        //old_leftover = would add new map data here...
-        //datacolumn holds up to 6 bits of data... 1 byte
-        old_leftover = newDataColumn[i] >> (8-remainder);
-        
-        for(j = 29; j >= 0; j--)
-        {
-          //xy11 1111
-          //shadow[startOfRow + j] = 1111 1100
-          //leftover = 0000 00xy
-          leftover = shadow[startOfRow + j] >> (8-remainder);
-          //xy11 1111
-          //0000 00xy
-          shadow[startOfRow + j] = (shadow[startOfRow + j] << remainder) | old_leftover;
-          //xy11 1111
-          //1111 1100
-          
-          old_leftover = leftover;
-        }
-        
-      }
-      else
-      {
-        //shift right move left
-        for(j = 0; j < 30; j++)
-        {
-          if(j == 0)
-          {
-            shadow[startOfRow] = 0;
-          }
-          else
-          {
-            shadow[startOfRow + j + 1] = shadow[startOfRow + j];
-          }
-        }
-        
-        //we've moved the porpper num of bytes... now we need to move bits!
-        
-        //old_leftover = 0;
-        //old_leftover = would add new map data here...
-        old_leftover = newDataColumn[i] << (remainder);
-        
-        for(j = 0; j < 30; j++)
-        {
-          //xy11 11ab
-          //shadow[startOfRow + j] = 00xy 1111
-          //leftover = ab00 0000
-          leftover = shadow[startOfRow + j] << (remainder);
-          //xy11 11ab
-          //00xy 1111
-          shadow[startOfRow + j] = (shadow[startOfRow + j] >> (8-remainder)) | old_leftover;
-          //xy11 11ab
-          //00xy 1111
-          
-          old_leftover = leftover;
         }
       }
     }
-    
-    if(deltaY != 0)
+    else
     {
-      if(deltaY > 0)
+      //move up, shift down
+      for(i = 0; i < 32; i++)
       {
-        //move down
-        //for every 1 bit we move "down" push this row down by (30*i)
+        //bottom = bottom-numtiles
         for(j = 0; j < 30; j++)
         {
-          
+          if(i >= 32-numTiles_1)
+          {
+            shadow[i*30 + j] = newDataRow[j];
+          }
+          else
+          {
+            shadow[i*30 + j] = shadow[(i+numTiles_1)*30 + j];
+          }
         }
       }
-      else
-      {
-        //move up
-      }
-      
     }
     
   }
-  
+
+  if(deltaX != 0)
+  {
+    for(i = 0; i < 32; i++)
+    {
+      int startOfRow = i*30;
+
+        //SHIFTING X FIRST
+        if(deltaX > 0)
+        {
+          //shift left move right
+          for(j = 0; j < 30; j++)
+          {
+            if(j >= 30-numBytes)
+            {
+              shadow[startOfRow + j] = 0;
+            }
+            else
+            {
+              shadow[startOfRow + j] = shadow[startOfRow + j + numBytes];
+            }
+          }
+          //we've moved the porpper num of bytes... now we need to move bits!
+
+
+          //old_leftover = 0;
+          //old_leftover = would add new map data here...
+          //datacolumn holds up to 6 bits of data... 1 byte
+          old_leftover = newDataColumn[i] >> (8-remainder);
+
+          for(j = 29; j >= 0; j--)
+          {
+            //xy11 1111
+            //shadow[startOfRow + j] = 1111 1100
+            //leftover = 0000 numTiles
+            leftover = shadow[startOfRow + j] >> (8-remainder);
+            //xy11 1111
+            //0000 00xy
+            shadow[startOfRow + j] = (shadow[startOfRow + j] << remainder) | old_leftover;
+            //xy11 1111
+            //1111 1100
+
+            old_leftover = leftover;
+          }
+
+        }
+        else
+        {
+          //shift right move left
+          for(j = 29; j >= 0; j--)
+          {
+            if(j <= numBytes)
+            {
+              shadow[startOfRow + j] = 0;
+            }
+            else
+            {
+              shadow[startOfRow + j] = shadow[startOfRow + j - numBytes];
+            }
+          }
+
+          //we've moved the porpper num of bytes... now we need to move bits!
+
+          //old_leftover = 0;
+          //old_leftover = would add new map data here...
+          old_leftover = newDataColumn[i] << (remainder);
+
+          for(j = 0; j < 30; j++)
+          {
+            //xy11 11ab
+            //shadow[startOfRow + j] = 00xy 1111
+            //leftover = ab00 0000
+            leftover = shadow[startOfRow + j] << (remainder);
+            //xy11 11ab
+            //00xy 1111
+            shadow[startOfRow + j] = (shadow[startOfRow + j] >> (8-remainder)) | old_leftover;
+            //xy11 11ab
+            //00xy 1111
+
+            old_leftover = leftover;
+          }
+        }
+      
+
+    }
+  }
 }
 
 void setGround(unsigned char x, unsigned char y, byte placeMe)
@@ -315,11 +350,6 @@ short checkGround(unsigned char x, unsigned char y, byte val)
   //outsideHelper = (shadow[bytenum] >> remainder);
   //writeBinary(2, 10, shadow[bytenum]);
   return value;
-}
-
-void shiftshadow(int deltaX)
-{
-  int numTiles = deltaX/8;
 }
 
 
@@ -584,6 +614,19 @@ void main(void) {
     }
   }
   
+  shadowWorldX = 0;
+  shadowWorldY = 0;
+  
+  for(i = 0; i < 32; i++)
+  {
+    newDataColumn[i] = 0;
+  }
+  
+  for(i = 0; i < 30; i++)
+  {
+    newDataRow[i] = 0;
+  }
+  
   
   setGround(brick.x/8, brick.y/8, 0x03);
   
@@ -602,6 +645,7 @@ void main(void) {
     char res;
     char res2;
     char res3;
+    char breakBlock;
     
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, -1);
     if(res == 0)
@@ -722,7 +766,7 @@ void main(void) {
 
       //res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 0) | searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
       //res checks bellow and in the facing dir of the player...
-      char breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
+      breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
       
       //if((res == 1 || rectanglesHit(player.act.x, player.act.y, 16, 16, brick.act.x, brick.act.y, 8, 8)) && pad_result & 0x04)
       if((breakBlock != 0) && pad_result&0x04)
@@ -882,7 +926,7 @@ void main(void) {
     {
       char dx[32];
       //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "break block: %d", res);
+      sprintf(dx, "break block: %d", breakBlock);
       updateScreen(2, 7, dx, 32);
     }
     
@@ -890,29 +934,35 @@ void main(void) {
     
     //scrolling
     {
+      byte useScrolling = false;
+      
       int deltaX = 0;
       int deltaY = 0;
       deltaX = player.act.dx * player.act.moveSpeed;
       deltaY = player.act.dy * player.act.jumpSpeed;
       
-      /*
-      if(player.act.x + deltaX > 256/2)
+      if(useScrolling)
       {
-        world_x += deltaX;
-        
-        //we need to shift the shadow!
-        
-        shiftshadow(deltaX);
+        if(player.act.x + deltaX > 256/2)
+        {
+          world_x += deltaX;
+
+          //we need to shift the shadow!
+
+          //scrollShadow(deltaX, 0, newDataColumn, newDataRow);
+
+        }
+        else
+        {
+          player.act.x += deltaX;
+        }
       }
       else
       {
         player.act.x += deltaX;
-      }
-      */
-      {
-        player.act.x += deltaX;
         player.act.y += deltaY;
       }
+      
 
       //max val is 512
       scroll(world_x, world_y);
