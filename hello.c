@@ -168,10 +168,16 @@ void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
   int j = 0;
   char leftover = 0;
   char old_leftover = 0;
+  int numTiles_1;
+  int numBytes;
+  int remainder;
   
-  int numTiles_1 = deltaX >> 3; //number of tiles we need to move!
-  int numBytes = deltaX >> 2; //divide number by 4, or shift twice since we have 4 tiles per byte
-  int remainder = numTiles_1 & 0x07; // get the last 3 bits
+  //numTiles_1 = deltaX >> 3; //number of tiles we need to move!
+  numTiles_1 = deltaX/8;
+  //numBytes = deltaX >> 2; //divide number by 4, or shift twice since we have 4 tiles per byte
+  numBytes = deltaX/4;
+  //remainder = numTiles_1 & 0x07; // get the last 3 bits
+  remainder = numTiles_1 % 4; //4 tiles = 1 byte, how many do we have left
   
   shadowWorldX += remainder & 0x01;
   remainder = (remainder & 0x0E) + shadowWorldX/2;
@@ -226,12 +232,15 @@ void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
     
   }
   
-  outsideHelper = numTiles_1;
-  outsideHelper3 = numBytes;
-  outsideHelper2 = remainder;
-
+  
   if(deltaX != 0)
   {
+    
+    outsideHelper = numTiles_1;
+    outsideHelper3 = numBytes;
+    outsideHelper2 = remainder;
+
+    
     for(i = 0; i < 32; i++)
     {
       int startOfRow = i*30;
@@ -957,7 +966,13 @@ void main(void) {
 
           //we need to shift the shadow!
           
-          if(abs(deltaX)/8 >= 4)
+          
+          if(deltaX != 0)
+          {
+            outsideHelper = -1;
+          }
+          
+          if(abs(shadowWorldX)/8 >= 4)
           {
             scrollShadow(deltaX, 0, newDataColumn, newDataRow);
           }
