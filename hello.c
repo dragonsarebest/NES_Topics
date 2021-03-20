@@ -36,7 +36,7 @@ unsigned char name[]={\
 
 //1920 bits, 1 for am i ground, 1 for am i breakable...
 //#define SHADOW_SIZE 240
-#define SHADOW_SIZE 256 //some buffer (of 2 columns)
+#define SHADOW_SIZE 240 // 30 columns, 32 rows
 char shadow[SHADOW_SIZE];
 
 byte outsideHelper; //used for debugging
@@ -141,6 +141,137 @@ void writeBinary(unsigned char x, unsigned char y, byte value)
   //sprintf(dx, "%d", player.act.dx);
   sprintf(dx, "%d %d %d %d %d %d %d %d", (value&0x80)>>7, (value&0x40)>>6, (value&0x20) >>5, (value&0x10)>>4, (value&0x08)>>3, (value&0x04)>>2, (value&0x02)>>1, value&0x01);
   updateScreen(x, y, dx, 16);
+}
+
+
+void scrollShadoe(int deltaX, int deltaY, char * newDataColumn, char * newDataRow)
+{
+  //deltaX should be a power of 2, greater than 0...
+  //deltaY
+  //newDataColumn has 32 bytes
+  //newDataRow has 30 bytes
+  
+  //can only scroll up to 4 tile in x or y dir at a time. otherwise we would need to rework how we input large potions of data..
+  //this works with less than 1 byte. w/ 2 bits per tile = 4 tiles per byte
+  
+  //#define SHADOW_SIZE 240 //30 columns, 32 rows
+  //char shadow[SHADOW_SIZE];
+  char * pos = shadow;
+  int i = 0;
+  int j = 0;
+  
+  int dataPos = 0;
+  
+  //dont fetch new data, just scroll
+  
+  int numBytes = deltaX >> 3; //number of full bytes we need to move, same as dividing by 8
+  int remainder = deltaX & 0x07; //gets the remainder, same as % by 8
+  char leftover = 0;
+  char old_leftover = 0;
+
+  for(i = 0; i < 32; i++)
+  {
+    int startOfRow = i*30;
+    
+    if(deltaX != 0)
+    {
+      //SHIFTING X FIRST
+      if(deltaX > 0)
+      {
+        //shift left move right
+        for(j = 0; j < 30; j++)
+        {
+          if(j == 29)
+          {
+            shadow[startOfRow + j] = 0;
+          }
+          else
+          {
+            shadow[startOfRow + j] = shadow[startOfRow + j + 1];
+          }
+        }
+        //we've moved the porpper num of bytes... now we need to move bits!
+        
+        
+        //old_leftover = 0;
+        //old_leftover = would add new map data here...
+        //datacolumn holds up to 6 bits of data... 1 byte
+        old_leftover = newDataColumn[i] >> (8-remainder);
+        
+        for(j = 29; j >= 0; j--)
+        {
+          //xy11 1111
+          //shadow[startOfRow + j] = 1111 1100
+          //leftover = 0000 00xy
+          leftover = shadow[startOfRow + j] >> (8-remainder);
+          //xy11 1111
+          //0000 00xy
+          shadow[startOfRow + j] = (shadow[startOfRow + j] << remainder) | old_leftover;
+          //xy11 1111
+          //1111 1100
+          
+          old_leftover = leftover;
+        }
+        
+      }
+      else
+      {
+        //shift right move left
+        for(j = 0; j < 30; j++)
+        {
+          if(j == 0)
+          {
+            shadow[startOfRow] = 0;
+          }
+          else
+          {
+            shadow[startOfRow + j + 1] = shadow[startOfRow + j];
+          }
+        }
+        
+        //we've moved the porpper num of bytes... now we need to move bits!
+        
+        //old_leftover = 0;
+        //old_leftover = would add new map data here...
+        old_leftover = newDataColumn[i] << (remainder);
+        
+        for(j = 0; j < 30; j++)
+        {
+          //xy11 11ab
+          //shadow[startOfRow + j] = 00xy 1111
+          //leftover = ab00 0000
+          leftover = shadow[startOfRow + j] << (remainder);
+          //xy11 11ab
+          //00xy 1111
+          shadow[startOfRow + j] = (shadow[startOfRow + j] >> (8-remainder)) | old_leftover;
+          //xy11 11ab
+          //00xy 1111
+          
+          old_leftover = leftover;
+        }
+      }
+    }
+    
+    if(deltaY != 0)
+    {
+      if(deltaY > 0)
+      {
+        //move down
+        //for every 1 bit we move "down" push this row down by (30*i)
+        for(j = 0; j < 30; j++)
+        {
+          
+        }
+      }
+      else
+      {
+        //move up
+      }
+      
+    }
+    
+  }
+  
 }
 
 void setGround(unsigned char x, unsigned char y, byte placeMe)
@@ -387,7 +518,7 @@ void main(void) {
 
   unsigned int i = 0, j = 0;
   
-  char debugCheck = true;
+  char debugCheck = false;
       
   pal_all(PALETTE);// generally before game loop (in main)
   
@@ -503,11 +634,13 @@ void main(void) {
       
       if(player.act.dy > 0 && playerInAir)
       {
+        //look 1 block down... 
         res = res | checkGround((player.act.x/8), ((player.act.y)/8)+3, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+3, 1);
         res3 = res;
         
         if(player.act.dy * player.act.jumpSpeed >= 8)
         {
+          //look 2 blocks down...
           res = res | checkGround((player.act.x/8), ((player.act.y)/8)+4, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+4, 1);
         }
       }
@@ -515,8 +648,7 @@ void main(void) {
     }
     
     
-    if(debugCheck)
-    {
+    
       if(res != 0)
       {
         player.act.grounded = true;
@@ -526,12 +658,12 @@ void main(void) {
         player.act.grounded = false;
         if(player.act.grounded == false && playerInAir == false)
         {
-          //start falling!
+          //start falling! we walk off a block and dont jump
           player.act.jumpTimer = MAX_JUMP/2;
           playerInAir = true;
         }
       }
-    }
+    
     
     outsideHelper = res;
     outsideHelper3 = res3;
@@ -618,19 +750,6 @@ void main(void) {
           itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
           itemY = ((player.act.y)/8)+1;
         }
-        /*
-        
-        {
-          char dx[32];
-          //sprintf(dx, "%d", player.act.dx);
-          sprintf(dx, "block: %d %d", brick.x, brick.y);
-          updateScreen(2, 8, dx, 32);
-          
-          sprintf(dx, "estimatedPos: %d, %d", itemX*8, itemY*8);
-          updateScreen(2, 9, dx, 32);
-        }
-        */
-        
         
         
         setGround(itemX, itemY, 0);
@@ -659,7 +778,7 @@ void main(void) {
     }
     
     
-    if(player.act.grounded && playerInAir && debugCheck)
+    if(player.act.grounded && playerInAir)
     {
       int itemX, itemY;
       //1, 2, 4, 8
@@ -705,7 +824,6 @@ void main(void) {
       
       playerInAir = false;
       player.act.grounded = false;
-      //debugCheck = false;
       
     }
     
@@ -724,20 +842,12 @@ void main(void) {
 
     if(playerInAir && !player.act.grounded)
     {
-      //going up or down
+      //going up or down in the air
       player.act.dy = jumpTable[player.act.jumpTimer];
       if(player.act.jumpTimer != MAX_JUMP-1)
         player.act.jumpTimer++;
     }
-     
-    
-    player.act.x += player.act.dx * player.act.moveSpeed;
-    player.act.y += player.act.dy * player.act.jumpSpeed;
-    
-    //player.act.x = 12*8;
-    //player.act.y = 16*8;
-    
-    
+
     //debug
     
     {
