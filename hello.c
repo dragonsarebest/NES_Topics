@@ -154,6 +154,7 @@ void writeBinary(unsigned char x, unsigned char y, byte value)
 
 void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRow)
 {
+  //deltaX and deltaY = change in pixels
   //newDataColumn has 32 bytes
   //newDataRow has 30 bytes
   
@@ -177,6 +178,9 @@ void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
   shadowWorldX = shadowWorldX % 2;
   //only want remainder to be powers of 2
   
+  numBytes += remainder%8;
+  remainder = remainder/8;
+  //in case we have >= bits of information... 
   
   if(deltaY != 0)
   {
@@ -221,6 +225,10 @@ void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
     }
     
   }
+  
+  outsideHelper = numTiles_1;
+  outsideHelper3 = numBytes;
+  outsideHelper2 = remainder;
 
   if(deltaX != 0)
   {
@@ -709,9 +717,9 @@ void main(void) {
       }
     
     
-    outsideHelper = res;
-    outsideHelper3 = res3;
-    outsideHelper2 = player.act.grounded;
+    //outsideHelper = res;
+    //outsideHelper3 = res3;
+    //outsideHelper2 = player.act.grounded;
 
 
     //char temp = (player.act.dx == -1);
@@ -934,7 +942,7 @@ void main(void) {
     
     //scrolling
     {
-      byte useScrolling = false;
+      byte useScrolling = true;
       
       int deltaX = 0;
       int deltaY = 0;
@@ -948,14 +956,23 @@ void main(void) {
           world_x += deltaX;
 
           //we need to shift the shadow!
-
-          //scrollShadow(deltaX, 0, newDataColumn, newDataRow);
+          
+          if(abs(deltaX)/8 >= 4)
+          {
+            scrollShadow(deltaX, 0, newDataColumn, newDataRow);
+          }
+          else
+          {
+            shadowWorldX += deltaX;
+          }
+          
 
         }
         else
         {
           player.act.x += deltaX;
         }
+        player.act.y += deltaY;
       }
       else
       {
