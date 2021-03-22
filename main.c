@@ -43,7 +43,7 @@ char shadow[SHADOW_SIZE];
 //2 bits for 32 tiles, 2*32/8 = num bytes
 char newDataColumn[32];
 //newDataRow has 30 bytes, 2*30/8 = 7.5
-char newDataRow[30];
+char newDataRow[32];
 
 int shadowWorldX, shadowWorldY;
   
@@ -51,6 +51,7 @@ int shadowWorldX, shadowWorldY;
 byte outsideHelper; //used for debugging
 byte outsideHelper2;
 byte outsideHelper3;
+byte outsideHelper4;
 
 //define variables here
 
@@ -152,6 +153,12 @@ void writeBinary(unsigned char x, unsigned char y, byte value)
   updateScreen(x, y, dx, 16);
 }
 
+int modulo(int x, int y)
+{
+  //if y is a power of 2...
+  return (x &(y-1));
+}
+
 
 void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRow)
 {
@@ -165,8 +172,8 @@ void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
   //#define SHADOW_SIZE 240 //30 columns, 32 rows
   //char shadow[SHADOW_SIZE];
   char * pos = shadow;
-  int i = 0;
-  int j = 0;
+  int y = 0;
+  int x = 0;
   char leftover = 0;
   char old_leftover = 0;
   int numTiles_1;
@@ -176,13 +183,21 @@ void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
   
   deltaX+= shadowWorldX; //shadowWorldX accounts for any deltaX
   
-  //numTiles_1 = deltaX >> 3; //number of tiles we need to move!
-  numTiles_1 = deltaX/8;
-  //numBytes = numTiles_1 >> 2; //divide number by 4, or shift twice since we have 4 tiles per byte
-  numBytes = numTiles_1/4;
-  //remainder = numTiles_1 & 0x07; // get the last 3 bits
-  remainder = (numTiles_1 % 4) * 2; //4 tiles = 1 byte, how many bits are left
-  //remainder = 1, 2, or 3
+  numTiles_1 = deltaX >> 3; //each tile is 8 pixels
+  shadowWorldX += deltaX & 0x07; // if we have any leftover we keep that
+
+  numBytes = numTiles_1 >> 2; //divide number by 4, or shift twice since we have 4 tiles per byte
+  //numBytes = numTiles_1/4;
+  //remainder = (modulo(numTiles_1, 4)) << 2; // get the last 3 bits
+  //outsideHelper = remainder;
+  remainder = (numTiles_1 & 0x07) << 1; //4 tiles = 1 byte, how many bits are left
+  //outsideHelper = remainder;
+  //remainder = 2, 4, or 6
+  
+  outsideHelper = deltaX;
+  outsideHelper2 = remainder;
+  outsideHelper3 = numBytes;
+  outsideHelper4 = numTiles_1;
   
   //for some reason this is not scrolling....
   deltaY = newDataRow[0]; //gets rid of compiler errors... we dont have y scroll enabled so this code is never touched!
@@ -235,66 +250,76 @@ void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
   //if(deltaX != 0)
   {
     
-    outsideHelper = deltaX;
-    outsideHelper2 = remainder;
-    outsideHelper3 = numBytes;
-
-    
-    for(i = 0; i < 32; i++)
+    for(y = 0; y < 30; y++)
     {
-      int startOfRow = i*30;
+      //30 row
+      int startOfRow = y*32; //num of columns = 32
+      //2 bits, 4 tiles
 
         //SHIFTING X FIRST
         if(deltaX > 0)
         {
-          //shift left move right
-          for(j = 0; j < 30; j++)
+          if(numBytes != 0)
           {
-            if(j >= 30-numBytes)
+            //shift left move right
+            for(x = 0; x <32; x++)
             {
-              shadow[startOfRow + j] = 0;
+              int pos = (startOfRow + x)/4;
+              if(x >= 32-numBytes)
+              {
+                shadow[pos] = 0;
+              }
+              else
+              {
+                shadow[pos] = shadow[pos + numBytes];
+              }
             }
-            else
-            {
-              shadow[startOfRow + j] = shadow[startOfRow + j + numBytes];
-            }
+            //we've moved the porpper num of bytes... now we need to move bits!
           }
-          //we've moved the porpper num of bytes... now we need to move bits!
-
 
           //old_leftover = 0;
           //old_leftover = would add new map data here...
-          //datacolumn holds up to 6 bits of data... 1 byte
-          old_leftover = newDataColumn[i] >> (8-remainder);
-
-          for(j = 29; j >= 0; j--)
+          //datacolumn holds up to 8 bits of data... 1 byte
+          //newDataColumn[y] = 0xFF;
+          old_leftover = newDataColumn[y] >> (8-remainder);
+          //outsideHelper = old_leftover;
+          
+          for(x = 31; x >= 0; x--)
           {
+            int pos = (startOfRow + x)/4; //turn tile num to bytenum
             //xy11 1111
             //shadow[startOfRow + j] = 1111 1100
             //leftover = 0000 numTiles
-            leftover = shadow[startOfRow + j] >> (8-remainder);
+            leftover = shadow[pos] >> (8-remainder);
+            //outsideHelper2 = leftover;
+            //outsideHelper3 = shadow[pos];
             //xy11 1111
             //0000 00xy
-            shadow[startOfRow + j] = (shadow[startOfRow + j] << remainder) | old_leftover;
+            shadow[pos] = (shadow[pos] << remainder) | old_leftover;
+            //outsideHelper3 = shadow[pos];
             //xy11 1111
             //1111 1100
 
             old_leftover = leftover;
           }
-
         }
+      
         else
         {
           //shift right move left
-          for(j = 29; j >= 0; j--)
+          if(numBytes!=0)
           {
-            if(j <= numBytes)
+            for(x = 31; x >= 0; x--)
             {
-              shadow[startOfRow + j] = 0;
-            }
-            else
-            {
-              shadow[startOfRow + j] = shadow[startOfRow + j - numBytes];
+              int pos = (startOfRow + x)/4;
+              if(x <= numBytes)
+              {
+                shadow[pos] = 0;
+              }
+              else
+              {
+                shadow[pos] = shadow[pos - numBytes];
+              }
             }
           }
 
@@ -302,23 +327,25 @@ void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
 
           //old_leftover = 0;
           //old_leftover = would add new map data here...
-          old_leftover = newDataColumn[i] << (remainder);
+          old_leftover = newDataColumn[y] << (remainder);
 
-          for(j = 0; j < 30; j++)
+          for(x = 0; x < 32; x++)
           {
+            int pos = (startOfRow + x)/4;
             //xy11 11ab
             //shadow[startOfRow + j] = 00xy 1111
             //leftover = ab00 0000
-            leftover = shadow[startOfRow + j] << (remainder);
+            leftover = shadow[pos] << (remainder);
             //xy11 11ab
             //00xy 1111
-            shadow[startOfRow + j] = (shadow[startOfRow + j] >> (8-remainder)) | old_leftover;
+            shadow[pos] = (shadow[pos] >> (8-remainder)) | old_leftover;
             //xy11 11ab
             //00xy 1111
 
             old_leftover = leftover;
           }
         }
+        
       
 
     }
