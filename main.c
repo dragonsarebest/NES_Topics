@@ -40,8 +40,9 @@ unsigned char name[]={\
 char shadow[SHADOW_SIZE];
 
 //newDataColumn has 32 bytes
+//2 bits for 32 tiles, 2*32/8 = num bytes
 char newDataColumn[32];
-//newDataRow has 30 bytes
+//newDataRow has 30 bytes, 2*30/8 = 7.5
 char newDataRow[30];
 
 int shadowWorldX, shadowWorldY;
@@ -172,22 +173,20 @@ void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
   int numBytes;
   int remainder;
   
+  
+  deltaX+= shadowWorldX; //shadowWorldX accounts for any deltaX
+  
   //numTiles_1 = deltaX >> 3; //number of tiles we need to move!
   numTiles_1 = deltaX/8;
-  //numBytes = deltaX >> 2; //divide number by 4, or shift twice since we have 4 tiles per byte
-  numBytes = deltaX/4;
+  //numBytes = numTiles_1 >> 2; //divide number by 4, or shift twice since we have 4 tiles per byte
+  numBytes = numTiles_1/4;
   //remainder = numTiles_1 & 0x07; // get the last 3 bits
-  remainder = numTiles_1 % 4; //4 tiles = 1 byte, how many do we have left
+  remainder = (numTiles_1 % 4) * 2; //4 tiles = 1 byte, how many bits are left
+  //remainder = 1, 2, or 3
   
-  shadowWorldX += remainder & 0x01;
-  remainder = (remainder & 0x0E) + shadowWorldX/2;
-  shadowWorldX = shadowWorldX % 2;
-  //only want remainder to be powers of 2
-  
-  numBytes += remainder%8;
-  remainder = remainder/8;
-  //in case we have >= bits of information... 
-  
+  //for some reason this is not scrolling....
+  deltaY = newDataRow[0]; //gets rid of compiler errors... we dont have y scroll enabled so this code is never touched!
+  /*
   if(deltaY != 0)
   {
     
@@ -230,15 +229,15 @@ void scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRo
       }
     }
     
-  }
+  }*/
   
   
-  if(deltaX != 0)
+  //if(deltaX != 0)
   {
     
-    outsideHelper = numTiles_1;
-    outsideHelper3 = numBytes;
+    outsideHelper = deltaX;
     outsideHelper2 = remainder;
+    outsideHelper3 = numBytes;
 
     
     for(i = 0; i < 32; i++)
@@ -332,7 +331,10 @@ void setGround(unsigned char x, unsigned char y, byte placeMe)
   int bytenum;
   int remainder;
   byte mask = 0xFF;
-  int bitNum = (y*30*2 + x*2);
+  int bitNum;
+  //x -= world_x;
+  //y -= world_y;
+  bitNum = (y*30*2 + x*2);
   bytenum = bitNum >> 3;//same as dividing by 8...
   remainder = (bitNum & 0x07); //the lost 3 bits from divison
   //go remainder number of bits into shadow
@@ -357,7 +359,10 @@ short checkGround(unsigned char x, unsigned char y, byte val)
   int bytenum;
   int remainder;
   int value;
-  int bitNum = (y*30*2 + x*2);
+  int bitNum;
+  //x -= world_x;
+  //y -= world_y;
+  bitNum = (y*30*2 + x*2);
   bytenum = bitNum >> 3;//same as dividing by 8...
   remainder = (bitNum & 0x07) + val; //the lost 3 bits from divison
   //go remainder number of bits into shadow
@@ -594,7 +599,7 @@ void main(void) {
   player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
   
   player.act.alive = true;
-  player.act.moveSpeed = 2;
+  player.act.moveSpeed = 5;
   player.act.jumpSpeed = 3;
   player.act.grounded = true;
   
@@ -679,13 +684,16 @@ void main(void) {
       //pressing enter respawns brick...
       for(i = 0; i < 1; i++)
       {
+        //SPAWN
+        //SPAWN
         ppu_off();
-        vram_adr(NTADR_A(brick.x/8, brick.y/8));
+        //ppu_wait_nmi();
+        vram_adr(NTADR_A(brick.x>>3, brick.y>>3));
         vram_put(brick.sprite);
         ppu_on_all();
         
         brick.alive = true;
-        setGround(brick.x/8, brick.y/8, 0x03);
+        setGround(brick.x>>3, brick.y>>3, 0x03);
       }
     }
     
@@ -820,6 +828,7 @@ void main(void) {
         //delete obj from background...
         
         ppu_off();
+        //ppu_wait_nmi();
         vram_adr(NTADR_A(itemX, itemY));
         vram_put(0x00);
         ppu_on_all();
@@ -972,7 +981,7 @@ void main(void) {
             outsideHelper = -1;
           }
           
-          if(abs(shadowWorldX)/8 >= 4)
+          if(abs(shadowWorldX)>>3 >= 1)
           {
             scrollShadow(deltaX, 0, newDataColumn, newDataRow);
           }
