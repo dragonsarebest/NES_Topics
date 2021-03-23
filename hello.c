@@ -36,7 +36,10 @@ unsigned char name[]={\
 
 //1920 bits, 1 for am i ground, 1 for am i breakable...
 //#define SHADOW_SIZE 240
-#define SHADOW_SIZE 8 // 2 rows of 4
+#define NUM_SHADOW_ROW 2
+#define NUM_SHADOW_COL 4
+#define SHADOW_SIZE NUM_SHADOW_ROW*NUM_SHADOW_COL // 2 rows of 4
+
 char shadow[SHADOW_SIZE] = {0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA};
 
 byte outsideHelper; //used for debugging
@@ -88,6 +91,7 @@ void scrollShadow(int deltaX, char * newData)
   int numBytes;
   int remainder;
   byte oldLeftovers;
+  byte mono = false;
 
   outsideHelper = 0;
   outsideHelper2 = 0;
@@ -99,23 +103,32 @@ void scrollShadow(int deltaX, char * newData)
   shadowWorldX += deltaX & 0x07; // if we have any leftover we keep that
   numBytes = numTiles_1 >> 2; //divide number by 4, or shift twice since we have 4 tiles per byte
   remainder = (numTiles_1 & 0x07) << 1; //4 tiles = 1 byte, how many bits are left
-
-  for(y = 0; y < 2; y++)
+  
+  if(mono)
   {
-    oldLeftovers = newData[y] >> (8-remainder);
-    // y = row number
-    for(x = SHADOW_SIZE/2; x >= 0; x--)
+    //one row...
+    oldLeftovers = newData[0] >> (8-remainder);
+    for(y = SHADOW_SIZE-1; y >= 0; y--)
     {
-      //x = column number
-      byte index = (y*4 + x) >> 3;
-      {
-        char buffer[32];
-        sprintf(buffer, "index: %d", index);
-        updateScreen(2, 2 buffer, 32);
-      }
-      byte leftover = shadow[index] >> (8-remainder);
-      shadow[index] = (shadow[index] << remainder) | oldLeftovers;
+      byte leftover;
+      leftover = shadow[y] >> (8-remainder);
+      shadow[y] = (shadow[y] << remainder) | oldLeftovers;
       oldLeftovers = leftover;
+    }
+  }
+  else
+  {
+    for(y = 0; y < NUM_SHADOW_ROW; y++)
+    {
+      oldLeftovers = newData[y] >> (8-remainder);
+      for(x = NUM_SHADOW_COL-1; x >= 0; x--)
+      {
+        byte index = (y*NUM_SHADOW_COL)+x;
+        byte leftover;
+        leftover = shadow[index] >> (8-remainder);
+        shadow[index] = (shadow[index] << remainder) | oldLeftovers;
+        oldLeftovers = leftover;
+      }
     }
   }
 
@@ -127,7 +140,7 @@ void main(void) {
   unsigned char floorLevel = 20;
   unsigned char floorTile = 0xc0;
   //equal to num rows
-  char newData[2] = {0xC0, 0xC0};
+  char newData[NUM_SHADOW_COL] = {0x00, 0x00};
 
   unsigned int i = 0, j = 0;
 
