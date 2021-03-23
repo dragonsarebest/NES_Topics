@@ -90,107 +90,38 @@ void scrollShadow(int deltaX, char * newData)
   numBytes = 0;
   remainder = 2;
 
-  numBytes += remainder%8;
-  remainder = remainder/8;
-  //in case we have >= bits of information... 
-
-  outsideHelper = numTiles_1;
-  outsideHelper2 = remainder;
-  outsideHelper3 = numBytes;
-
-
-  oldLeftovers = newData[0] >> (8-remainder);
-  for(i = 0; i < SHADOW_SIZE; i++)
+  oldLeftovers = newData[0];
+  
+  outsideHelper = oldLeftovers;
+  
+  oldLeftovers = oldLeftovers >> (8-remainder);
+  //oldLeftovers = oldLeftovers >> 6;
+  //1111 1111 -> 0000 0011
+  
+  outsideHelper = oldLeftovers;
+  
+  for(i = SHADOW_SIZE; i >= 0; i--)
   {
-    //shift to left
-    byte leftover = shadow[i] >> (8-remainder);
-    shadow[i] = (shadow[i] << remainder) | old_leftover;
+    byte leftover = shadow[i];
+    outsideHelper = leftover;
+    leftover = leftover >> (8-remainder);
+    outsideHelper = leftover;
+    //1010 1010 -> 0000 0010
+    
+    outsideHelper = (shadow[i] << remainder);
+    //outsideHelper = 1010 1010 -> 1010 1000
+    
+    outsideHelper = (shadow[i] << remainder) | oldLeftovers;
+    //outsideHelper = 1010 1000 -> 1010 1011
+    
+    //old_leftover = 0000 0011
+    shadow[i] = (shadow[i] << remainder) | oldLeftovers;
+
     oldLeftovers = leftover;
+    outsideHelper = oldLeftovers;
+    //oldLeftovers = 0000 0010
   }
-  /*
-  for(i = 0; i < 32; i++)
-  {
-    int startOfRow = i*30;
-
-    //SHIFTING X FIRST
-    if(deltaX > 0)
-    {
-      //shift left move right
-      for(j = 0; j < 30; j++)
-      {
-        if(j >= 30-numBytes)
-        {
-          shadow[startOfRow + j] = 0;
-        }
-        else
-        {
-          shadow[startOfRow + j] = shadow[startOfRow + j + numBytes];
-        }
-      }
-      //we've moved the porpper num of bytes... now we need to move bits!
-
-
-      //old_leftover = 0;
-      //old_leftover = would add new map data here...
-      //datacolumn holds up to 6 bits of data... 1 byte
-      old_leftover = newData[i] >> (8-remainder);
-
-      for(j = 29; j >= 0; j--)
-      {
-        //xy11 1111
-        //shadow[startOfRow + j] = 1111 1100
-        //leftover = 0000 numTiles
-        leftover = shadow[startOfRow + j] >> (8-remainder);
-        //xy11 1111
-        //0000 00xy
-        shadow[startOfRow + j] = (shadow[startOfRow + j] << remainder) | old_leftover;
-        //xy11 1111
-        //1111 1100
-
-        old_leftover = leftover;
-      }
-
-    }
-    else
-    {
-      //shift right move left
-      for(j = 29; j >= 0; j--)
-      {
-        if(j <= numBytes)
-        {
-          shadow[startOfRow + j] = 0;
-        }
-        else
-        {
-          shadow[startOfRow + j] = shadow[startOfRow + j - numBytes];
-        }
-      }
-
-      //we've moved the porpper num of bytes... now we need to move bits!
-
-      //old_leftover = 0;
-      //old_leftover = would add new map data here...
-      old_leftover = newData[i] << (remainder);
-
-      for(j = 0; j < 30; j++)
-      {
-        //xy11 11ab
-        //shadow[startOfRow + j] = 00xy 1111
-        //leftover = ab00 0000
-        leftover = shadow[startOfRow + j] << (remainder);
-        //xy11 11ab
-        //00xy 1111
-        shadow[startOfRow + j] = (shadow[startOfRow + j] >> (8-remainder)) | old_leftover;
-        //xy11 11ab
-        //00xy 1111
-
-        old_leftover = leftover;
-      }
-    }
-
-
-  }
-  */
+  newData[0] = 0xAA; //to keep it scrolling 
 
 }
 
@@ -199,7 +130,7 @@ void main(void) {
 
   unsigned char floorLevel = 20;
   unsigned char floorTile = 0xc0;
-  char newData[1] = {0xff};
+  char newData[1] = {0x00};
 
   unsigned int i = 0, j = 0;
 
@@ -236,16 +167,16 @@ void main(void) {
     int deltaX = 8;
 
     world_x += deltaX;
-
-
-    if(deltaX != 0)
-    {
-      outsideHelper = -1;
-    }
-
+    /*
+    //expected result!
+    // AA AA AA AA
+    // AA AA AA A8
+    // AA AA AA A2
+    // AA AA AA 8A
+    // AA AA AA 2A
+    // AA AA A8 AA...
+    */
     scrollShadow(deltaX, newData);
-
-    //max val is 512
     scroll(world_x, world_y);
 
     for(i = 0; i < 5; i++)
