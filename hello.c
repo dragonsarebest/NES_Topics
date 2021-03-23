@@ -62,16 +62,6 @@ const char PALETTE[32] =
 
 void scrollShadow(int deltaX, char * newData)
 {
-  //deltaX and deltaY = change in pixels
-  //newDataColumn has 32 bytes
-  //newDataRow has 30 bytes
-
-  //can only scroll up to 4 tile in x or y dir at a time. otherwise we would need to rework how we input large potions of data..
-  //this works with less than 1 byte. w/ 2 bits per tile = 4 tiles per byte
-
-  //#define SHADOW_SIZE 240 //30 columns, 32 rows
-  //char shadow[SHADOW_SIZE];
-  char * pos = shadow;
   int i = 0;
   int j = 0;
   char leftover = 0;
@@ -170,10 +160,10 @@ void main(void) {
     /*
     //expected result!
     // AA AA AA AA
-    // AA AA AA A8
-    // AA AA AA A2
-    // AA AA AA 8A
-    // AA AA AA 2A
+    // AA AA AA A8 -gets this
+    // AA AA AA A2 -gets AA AA AA A0
+    // AA AA AA 8A -gets AA AA AA 80
+    // AA AA AA 2A -gets AA AA AA 00
     // AA AA A8 AA...
     */
     scrollShadow(deltaX, newData);
