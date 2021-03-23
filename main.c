@@ -613,8 +613,9 @@ void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
 // main function, run after console reset
 void main(void) {
 
-  char stausX = 1;
-  char stausY = 64;
+  char cur_oam;
+  char stausX = 2;
+  char stausY = 2;
   char statusVal = 0xA0;
   
   unsigned char floorLevel = 20;
@@ -722,25 +723,25 @@ void main(void) {
 
   randomizeParticle(singleBricks, brickSpeed, brick.x, brick.y);
   // enable PPU rendeing (turn on screen)
+  
+  
+  oam_clear();
+  cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
+  
   ppu_on_all();
 
   //always updates @ 60fps
   while (1)
   {
 
-    char pad_result= pad_poll(0) | pad_poll(1);
-
-    //game loop
-    char cur_oam = 0; // max of 64 sprites on screen @ once w/out flickering
-    
-    //sprite-0
-    split(stausX, stausY, statusVal);
-    
     char res;
     char res2;
     char res3;
     char breakBlock;
-
+    char pad_result= pad_poll(0) | pad_poll(1);    
+    
+    cur_oam = 0;
+    
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, -1);
     if(res == 0)
     {
@@ -1029,6 +1030,7 @@ void main(void) {
           {
             int returnVAL;
             
+            //split(world_x, 0);
             scroll(world_x, world_y);
             
             returnVAL = scrollShadow(deltaX, 0, newDataColumn, newDataRow);
