@@ -36,8 +36,8 @@ unsigned char name[]={\
 
 //1920 bits, 1 for am i ground, 1 for am i breakable...
 //#define SHADOW_SIZE 240
-#define SHADOW_SIZE 4 // 30 columns, 32 rows
-char shadow[SHADOW_SIZE];
+#define SHADOW_SIZE 8 // 2 rows of 4
+char shadow[SHADOW_SIZE] = {0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA};
 
 byte outsideHelper; //used for debugging
 byte outsideHelper2;
@@ -45,6 +45,7 @@ byte outsideHelper3;
 
 int world_x = 0;
 int world_y = 0;
+int shadowWorldX = 0;
 
 const char PALETTE[32] = 
 {
@@ -60,10 +61,27 @@ const char PALETTE[32] =
   0x1d, 0x37, 0x2b,// sprite palette 3
 };
 
+void updateScreen(unsigned char column, unsigned char row, char * buffer, unsigned char num_bytes)
+{
+  vrambuf_clear();
+  set_vram_update(updbuf);
+  vrambuf_put(NTADR_A(column, row), buffer, num_bytes);
+  vrambuf_flush();
+}
+
+void writeBinary(unsigned char x, unsigned char y, byte value)
+{
+  char dx[16];
+  //sprintf(dx, "%d", player.act.dx);
+  sprintf(dx, "%d %d %d %d %d %d %d %d", (value&0x80)>>7, (value&0x40)>>6, (value&0x20) >>5, (value&0x10)>>4, (value&0x08)>>3, (value&0x04)>>2, (value&0x02)>>1, value&0x01);
+  updateScreen(x, y, dx, 16);
+}
+
+
 void scrollShadow(int deltaX, char * newData)
 {
-  int i = 0;
-  int j = 0;
+  int y = 0;
+  int x = 0;
   char leftover = 0;
   char old_leftover = 0;
   int numTiles_1;
@@ -74,44 +92,32 @@ void scrollShadow(int deltaX, char * newData)
   outsideHelper = 0;
   outsideHelper2 = 0;
   outsideHelper3 = 0;
-  deltaX = 0;
 
-  numTiles_1 = 1;
-  numBytes = 0;
-  remainder = 2;
+  deltaX+= shadowWorldX; //shadowWorldX accounts for any deltaX
+  
+  numTiles_1 = deltaX >> 3; //each tile is 8 pixels
+  shadowWorldX += deltaX & 0x07; // if we have any leftover we keep that
+  numBytes = numTiles_1 >> 2; //divide number by 4, or shift twice since we have 4 tiles per byte
+  remainder = (numTiles_1 & 0x07) << 1; //4 tiles = 1 byte, how many bits are left
 
-  oldLeftovers = newData[0];
-  
-  outsideHelper = oldLeftovers;
-  
-  oldLeftovers = oldLeftovers >> (8-remainder);
-  //oldLeftovers = oldLeftovers >> 6;
-  //1111 1111 -> 0000 0011
-  
-  outsideHelper = oldLeftovers;
-  
-  for(i = SHADOW_SIZE; i >= 0; i--)
+  for(y = 0; y < 2; y++)
   {
-    byte leftover = shadow[i];
-    outsideHelper = leftover;
-    leftover = leftover >> (8-remainder);
-    outsideHelper = leftover;
-    //1010 1010 -> 0000 0010
-    
-    outsideHelper = (shadow[i] << remainder);
-    //outsideHelper = 1010 1010 -> 1010 1000
-    
-    outsideHelper = (shadow[i] << remainder) | oldLeftovers;
-    //outsideHelper = 1010 1000 -> 1010 1011
-    
-    //old_leftover = 0000 0011
-    shadow[i] = (shadow[i] << remainder) | oldLeftovers;
-
-    oldLeftovers = leftover;
-    outsideHelper = oldLeftovers;
-    //oldLeftovers = 0000 0010
+    oldLeftovers = newData[y] >> (8-remainder);
+    // y = row number
+    for(x = SHADOW_SIZE/2; x >= 0; x--)
+    {
+      //x = column number
+      byte index = (y*4 + x) >> 3;
+      {
+        char buffer[32];
+        sprintf(buffer, "index: %d", index);
+        updateScreen(2, 2 buffer, 32);
+      }
+      byte leftover = shadow[index] >> (8-remainder);
+      shadow[index] = (shadow[index] << remainder) | oldLeftovers;
+      oldLeftovers = leftover;
+    }
   }
-  newData[0] = 0xAA; //to keep it scrolling 
 
 }
 
@@ -120,7 +126,8 @@ void main(void) {
 
   unsigned char floorLevel = 20;
   unsigned char floorTile = 0xc0;
-  char newData[1] = {0x00};
+  //equal to num rows
+  char newData[2] = {0xC0, 0xC0};
 
   unsigned int i = 0, j = 0;
 
@@ -130,11 +137,6 @@ void main(void) {
   {
     vram_adr(NTADR_A(i,floorLevel));
     vram_put(floorTile);
-  }
-
-  for(i = 0; i < SHADOW_SIZE; i++)
-  {
-    shadow[i] = 0xAA;
   }
 
   vram_adr(NTADR_A(100/8,18));
@@ -159,17 +161,17 @@ void main(void) {
     world_x += deltaX;
     /*
     //expected result!
-    // AA AA AA AA
-    // AA AA AA A8 -gets this
-    // AA AA AA A2 -gets AA AA AA A0
-    // AA AA AA 8A -gets AA AA AA 80
-    // AA AA AA 2A -gets AA AA AA 00
+    // AA AA AA AA 
+    // AA AA AA A8 -gets AA AA AA A8 - correct
+    // AA AA AA A2 -gets AA AA AA A2
+    // AA AA AA 8A -gets AA AA AA 8A
+    // AA AA AA 2A -gets AA AA AA 2A
     // AA AA A8 AA...
     */
     scrollShadow(deltaX, newData);
-    scroll(world_x, world_y);
+    //scroll(world_x, world_y);
 
-    for(i = 0; i < 5; i++)
+    for(i = 0; i < 15; i++)
     {
       ppu_wait_frame();
     }
