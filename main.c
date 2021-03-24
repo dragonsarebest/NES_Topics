@@ -45,7 +45,7 @@ unsigned char name[]={\
 #define NUM_SHADOW_COL 32
 //32*32 = num tiles = 256 *2 = number of bits = 2048 / 8 = num bytes = 256 bytes
 //32 tiles *2 = 64 bits per row,  8 bytes per row
-#define BYTE_PER_ROW NUM_SHADOW_ROW*2/8 // 8
+#define BYTE_PER_ROW NUM_SHADOW_ROW/4 // 8
 #define BYTE_PER_COL 32
 
 #define SHADOW_SIZE (NUM_SHADOW_ROW * NUM_SHADOW_COL)/4
@@ -55,9 +55,10 @@ char shadow[SHADOW_SIZE];
 //2 bits for 32 tiles, 2*32/8 = num bytes
 char newDataColumn[NUM_SHADOW_COL];
 //newDataRow has 30 bytes, 2*30/8 = 7.5
-char newDataRow[NUM_SHADOW_ROW];
+//char newDataRow[NUM_SHADOW_ROW];
 
 int shadowWorldX, shadowWorldY;
+byte doScrollShadow = false;
 
 
 byte outsideHelper; //used for debugging
@@ -172,7 +173,7 @@ int modulo(int x, int y)
 }
 
 
-int scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRow)
+int scrollShadow(int deltaX, char * newDataColumn)
 {
   int y = 0;
   int x = 0;
@@ -181,9 +182,11 @@ int scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRow
   int numTiles_1;
   int numBytes;
   int remainder;
+  byte dirPositive = false;
 
 
   deltaX += shadowWorldX; //shadowWorldX accounts for any deltaX left over 
+  dirPositive = deltaX > 0;
   deltaX = abs(deltaX);
   if(deltaX < 8)
   {
@@ -197,92 +200,15 @@ int scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRow
   
   numBytes = numTiles_1 >> 2; //divide number by 4, or shift twice since we have 4 tiles per byte
   remainder = (numTiles_1 & 0x07) << 1; //4 tiles = 1 byte, how many bits are left
-
-  
-  {
-    char dx[32];
-    sprintf(dx, "remainder: %d", remainder);
-    updateScreen(2, 3, dx, 32);
-    sprintf(dx, "deltaX: %d   ", deltaX);
-    updateScreen(2, 4, dx, 32);
-  }
-  
-  {
-    char dx[32];
-    sprintf(dx, "shadowWorldX: %d", shadowWorldX);
-    updateScreen(2, 2, dx, 32);
-  }
   
   //for some reason this is not scrolling....
-  deltaY = newDataRow[0]; //gets rid of compiler errors... we dont have y scroll enabled so this code is never touched!
-  /*
-  if(deltaY != 0)
-  {
-
-    if(deltaY > 0)
-    {
-      //move down, shift up
-      for(i = 31; i >= 0; i--)
-      {
-        //bottom = bottom-numtiles
-        for(j = 0; j < 30; j++)
-        {
-          if(i <= numTiles_1)
-          {
-            shadow[i*30 + j] = newDataRow[j];
-          }
-          else
-          {
-            shadow[i*30 + j] = shadow[(i-numTiles_1)*30 + j ];
-          }
-        }
-      }
-    }
-    else
-    {
-      //move up, shift down
-      for(i = 0; i < 32; i++)
-      {
-        //bottom = bottom-numtiles
-        for(j = 0; j < 30; j++)
-        {
-          if(i >= 32-numTiles_1)
-          {
-            shadow[i*30 + j] = newDataRow[j];
-          }
-          else
-          {
-            shadow[i*30 + j] = shadow[(i+numTiles_1)*30 + j];
-          }
-        }
-      }
-    }
-
-  }*/
-
-
-  /*
-  for(y = 0; y < NUM_SHADOW_ROW; y++)
-    {
-      oldLeftovers = newData[y] >> (8-remainder);
-      for(x = NUM_SHADOW_COL-1; x >= 0; x--)
-      {
-        byte index = (y*NUM_SHADOW_COL)+x;
-        byte leftover;
-        leftover = shadow[index] >> (8-remainder);
-        shadow[index] = (shadow[index] << remainder) | oldLeftovers;
-        oldLeftovers = leftover;
-      }
-    }
-  */
-
   if(deltaX != 0)
   {
 
     for(y = 0; y < BYTE_PER_ROW; y++)
     {
       //SHIFTING X FIRST
-      if(deltaX > 0)
+      if(!dirPositive)
       {
         if(numBytes != 0)
         {
@@ -307,6 +233,7 @@ int scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRow
           }
           //we've moved the porpper num of bytes... now we need to move bits!
         }
+        
 
         old_leftover = newDataColumn[y] >> (8-remainder);
 
@@ -358,7 +285,7 @@ int scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRow
 
         //old_leftover = 0;
         //old_leftover = would add new map data here...
-        old_leftover = newDataColumn[y] << (remainder);
+        old_leftover = newDataColumn[y] << (8-remainder);
 
         for(x = 0; x < 32; x++)
         {
@@ -369,8 +296,12 @@ int scrollShadow(int deltaX, int deltaY, char * newDataColumn, char * newDataRow
             updateScreen(2,2, "ERROR_bits2", 11);
             return index;
           }
-          leftover = shadow[index] << (remainder);
-          shadow[index] = (shadow[index] >> (8-remainder)) | old_leftover;
+          //outsideHelper2 = remainder;
+          leftover = shadow[index] << (8-remainder);
+          //outsideHelper = leftover;
+          // A8 = 02
+          shadow[index] = (shadow[index] >> (remainder)) | old_leftover;
+          //outsideHelper = shadow[index];
           old_leftover = leftover;
         }
       }
@@ -387,6 +318,8 @@ void setGround(unsigned char x, unsigned char y, byte placeMe)
   int remainder;
   byte mask = 0xFF;
   int bitNum;
+  
+  //if we are NOT scrolling....
   //x -= world_x;
   //y -= world_y;
   bitNum = (y*BYTE_PER_COL*2 + x*2);
@@ -402,7 +335,7 @@ void setGround(unsigned char x, unsigned char y, byte placeMe)
 
   //writeBinary(2, 8, shadow[bytenum]);
   //outsideHelper = shadow[bytenum];
-  shadow[bytenum] = (shadow[bytenum] & mask | placeMe << (remainder));
+  shadow[bytenum] = ((shadow[bytenum] & mask) | (placeMe << remainder));
   //outsideHelper = shadow[bytenum];
   //writeBinary(2, 9, shadow[bytenum]);
 }
@@ -415,6 +348,7 @@ short checkGround(unsigned char x, unsigned char y, byte val)
   int remainder;
   int value;
   int bitNum;
+  
   //x -= world_x;
   //y -= world_y;
   bitNum = (y*BYTE_PER_COL*2 + x*2);
@@ -637,7 +571,7 @@ void main(void) {
 
   unsigned int i = 0, j = 0;
 
-  char debugCheck = false;
+  char debugCheck = true;
 
   pal_all(PALETTE);// generally before game loop (in main)
 
@@ -713,10 +647,10 @@ void main(void) {
     newDataColumn[i] = 0;
   }
 
-  for(i = 0; i < BYTE_PER_ROW; i++)
-  {
-    newDataRow[i] = 0;
-  }
+  //for(i = 0; i < BYTE_PER_ROW; i++)
+  //{
+   // newDataRow[i] = 0;
+  //}
 
 
   setGround(brick.x/8, brick.y/8, 0x03);
@@ -725,8 +659,7 @@ void main(void) {
   // enable PPU rendeing (turn on screen)
   
   
-  oam_clear();
-  cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
+  
   
   ppu_on_all();
 
@@ -740,7 +673,9 @@ void main(void) {
     char breakBlock;
     char pad_result= pad_poll(0) | pad_poll(1);    
     
-    cur_oam = 0;
+    //oam_clear();
+    cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
+    //cur_oam = 4;
     
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, -1);
     if(res == 0)
@@ -1032,15 +967,17 @@ void main(void) {
             
             //split(world_x, 0);
             scroll(world_x, world_y);
-            
-            returnVAL = scrollShadow(deltaX, 0, newDataColumn, newDataRow);
-            
-            if(returnVAL != 0)
+            if(doScrollShadow)
             {
+              returnVAL = scrollShadow(deltaX, newDataColumn);
+
+              if(returnVAL != 0)
               {
-                char dx[32];
-                sprintf(dx, "index: %d", returnVAL);
-                updateScreen(2, 2, dx, 32);
+                {
+                  char dx[32];
+                  sprintf(dx, "index: %d", returnVAL);
+                  updateScreen(2, 2, dx, 32);
+                }
               }
             }
           }
@@ -1094,7 +1031,8 @@ void main(void) {
       feet.act.y = player.act.y + 8*3;
       cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
     }
-
+    
+    oam_hide_rest(cur_oam);
     //this makes it wait one frame in between updates
     ppu_wait_frame();
   }
