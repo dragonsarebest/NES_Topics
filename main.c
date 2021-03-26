@@ -225,6 +225,7 @@ void loadWorld()
     int x = tileNum-y;
     char numberOfTimes;
     char currentTile;
+    byte shadowBits = 0x00;
 
     //numberOfTimes = worldData[worldNumber][rleInt++];
     numberOfTimes = 1; // no rle compression atm
@@ -232,8 +233,28 @@ void loadWorld()
     currentTile = worldData[worldNumber][rleInt++];
     //increment rleInt once you find out how many tiles this tile repeats...
     
+    if(currentTile == 0xc1)
+    {
+      shadowBits = 0x01;
+    }
+    
+    if(currentTile == 0xc4 || currentTile == 0xc5 || currentTile == 0xc6 || currentTile == 0xc7)
+    {
+      shadowBits = 0x03;
+    }
+    
     for(i = 0; i < numberOfTimes; i++)
     {
+      if(shadowBits != 0x00)
+      {
+      	forShadow = forShadow | (shadowBits << currentBitShift);
+      }
+      currentBitShift -= 2;
+      if(currentBitShift < 0)
+      {
+        shadow[shadowNum++] = forShadow;
+        currentBitShift = 6;
+      }
       vram_put(currentTile);
     }
 
@@ -242,24 +263,6 @@ void loadWorld()
     if(tileNum >= 900)
     {
       break;
-    }
-  }
-  
-  
-  for(i = 0; i < NUM_SHADOW_ROW; i++)
-  {
-    for(rleInt = 0; rleInt < NUM_SHADOW_COL; rleInt++)
-    {
-      byte data = getchar_vram(rleInt, i);
-      byte value = 0x00;
-      //0000 0010 just breakable 0x02
-      //0000 0011 ground and breakable 0x03
-      //0000 0001 just ground 0x01
-      if(data == 0xc1)
-      {
-        value = 0x01;
-      }
-      setGround(rleInt, i, value);
     }
   }
 
