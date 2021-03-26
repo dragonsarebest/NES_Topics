@@ -41,11 +41,11 @@ unsigned char name[]={\
 // = 1024 tiles
 // 1024/4 = 256
 //8 *4 = 32 tiles
-#define NUM_SHADOW_ROW 29
-#define NUM_SHADOW_COL 31
+#define NUM_SHADOW_ROW 30
+#define NUM_SHADOW_COL 32
 //32*32 = num tiles = 256 *2 = number of bits = 2048 / 8 = num bytes = 256 bytes
 //32 tiles *2 = 64 bits per row,  8 bytes per row
-#define BYTE_PER_COL 31
+#define BYTE_PER_COL 32
 
 #define SHADOW_SIZE (NUM_SHADOW_ROW * NUM_SHADOW_COL)/4
 char shadow[SHADOW_SIZE];
@@ -57,8 +57,6 @@ byte outsideHelper4;
 
 #define NumWorlds 2
 #define LargestWorld 960
-//240 bytes if 4 tiles per byte... 
-//
 //960 is the largest map size...
 const char worldData[NumWorlds][LargestWorld] = {
 {
@@ -130,6 +128,22 @@ const char worldData[NumWorlds][LargestWorld] = {
 char worldNumber;
 char transition = 0x80; //first bit = right, left, up, down
 
+byte getchar_vram(byte x, byte y) {
+  // compute VRAM read address
+  word addr = NTADR_A(x,y);
+  // result goes into rd
+  byte rd;
+  // wait for VBLANK to start
+  ppu_wait_nmi();
+  // set vram address and read byte into rd
+  vram_adr(addr);
+  vram_read(&rd, 1);
+  // scroll registers are corrupt
+  // fix by setting vram address
+  vram_adr(0x0);
+  return rd;
+}
+
 void setGround(unsigned char x, unsigned char y, byte placeMe)
 {
   //placeMe is the replacement 2 bits of data
@@ -159,17 +173,50 @@ void setGround(unsigned char x, unsigned char y, byte placeMe)
   //writeBinary(2, 9, shadow[bytenum]);
 }
 
+short checkGround(unsigned char x, unsigned char y, byte val)
+{
+  //val = 0 if you want the 1st value and  = 1 if you want the 2nd
+  // 1 = ground, 0 = breakable
+  int bytenum;
+  int remainder;
+  int value;
+  int bitNum;
+
+  //x -= world_x;
+  //y -= world_y;
+  bitNum = (y*BYTE_PER_COL*2 + x*2);
+  //x & y are tile pos
+  //bitNum = (y/4) * NUM_SHADOW_COL + (x/4);
+  bytenum = bitNum >> 3;//same as dividing by 8...
+  remainder = (bitNum & 0x07) + val; //the lost 3 bits from divison
+  //go remainder number of bits into shadow
+  value = (shadow[bytenum] >> remainder) & 0x01;
+  //outsideHelper3 = value;
+  //outsideHelper2 = 0x01;
+  //outsideHelper = (shadow[bytenum] >> remainder);
+  //writeBinary(2, 10, shadow[bytenum]);
+  return value;
+}
+
 void loadWorld()
 {
   int i;
   int tileNum;
   int rleInt = 0;
+  int numDoor = 0;
+  
+  byte forShadow = 0x00;
+  int currentBitShift = 6;
+  int shadowNum = 0;
   //set shadow map & draw to vrambuffer B
+  
   for(i = 0; i < SHADOW_SIZE; i++)
   {
     shadow[i] = 0x00;
   }
+  
   vram_adr(NTADR_A(0,0));
+  
   //maps are using RLE compression!
   for(rleInt = 0; rleInt < LargestWorld; )
   {
@@ -178,36 +225,15 @@ void loadWorld()
     int x = tileNum-y;
     char numberOfTimes;
     char currentTile;
-    char shadowByte = 0;
-
-    outsideHelper = x;
-    outsideHelper2 = y;
 
     //numberOfTimes = worldData[worldNumber][rleInt++];
-    numberOfTimes = 1;
+    numberOfTimes = 1; // no rle compression atm
+    //mberOfTimes = worldData[worldNumber][rleInt++]; //w/ rle compression on...
     currentTile = worldData[worldNumber][rleInt++];
     //increment rleInt once you find out how many tiles this tile repeats...
-    outsideHelper3 = numberOfTimes;
-    outsideHelper4 = currentTile;
-
-    //0000 0010 just breakable 0x02
-    //0000 0011 ground and breakable 0x03
-    //0000 0001 just ground 0x01
-
-    if(currentTile == 0xc1)
-    {
-      shadowByte = 0x01;
-    }
-
-    if(currentTile >= 0xc4 && currentTile <= 0xc7)
-    {
-      //the door
-      shadowByte = 0x03;
-    }
-
+    
     for(i = 0; i < numberOfTimes; i++)
     {
-      setGround(x++, y, shadowByte);
       vram_put(currentTile);
     }
 
@@ -218,10 +244,79 @@ void loadWorld()
       break;
     }
   }
+  
+  
+  for(i = 0; i < NUM_SHADOW_ROW; i++)
+  {
+    for(rleInt = 0; rleInt < NUM_SHADOW_COL; rleInt++)
+    {
+      byte data = getchar_vram(rleInt, i);
+      byte value = 0x00;
+      //0000 0010 just breakable 0x02
+      //0000 0011 ground and breakable 0x03
+      //0000 0001 just ground 0x01
+      if(data == 0xc1)
+      {
+        value = 0x01;
+      }
+      setGround(rleInt, i, value);
+    }
+  }
 
+  outsideHelper = numDoor;
 }
 
 
+void debugDisplayShadow()
+{
+  
+  int y, x;
+  vram_adr(NTADR_A(0,0));
+  for( y = 0; y < SHADOW_SIZE; y++)
+  {
+    char shadowByte = shadow[y];
+    //0000 0010 just breakable 0x02
+    //0000 0011 ground and breakable 0x03
+    //0000 0001 just ground 0x01
+    for(x = 0; x< 4; x++)
+    {
+      byte currentData = 0x00;
+      if(x == 0)
+      {
+        currentData = (shadowByte & 0xC0) >> 6;
+      }
+      else if(x == 1)
+      {
+        currentData = (shadowByte & 0x30) >> 4;
+      }
+      else if(x == 2)
+      {
+        currentData = (shadowByte & 0x0C) >> 2;
+      }
+      else
+      {
+        currentData = shadowByte & 0x03;
+      }
+      if(currentData == 0x02)
+      {
+        vram_put(0x02);
+      }
+      else if(currentData == 0x03)
+      {
+        vram_put(0x03);
+      }
+      else if(currentData == 0x01)
+      {
+        vram_put(0x01);
+      }
+      else
+      {
+        vram_put(0x00);
+      }
+      
+    }
+  }
+}
 
 
 //define variables here
@@ -326,51 +421,6 @@ int modulo(int x, int y)
 {
   //if y is a power of 2...
   return (x &(y-1));
-}
-
-
-
-
-short checkGround(unsigned char x, unsigned char y, byte val)
-{
-  //val = 0 if you want the 1st value and  = 1 if you want the 2nd
-  // 1 = ground, 0 = breakable
-  int bytenum;
-  int remainder;
-  int value;
-  int bitNum;
-
-  //x -= world_x;
-  //y -= world_y;
-  bitNum = (y*BYTE_PER_COL*2 + x*2);
-  //x & y are tile pos
-  //bitNum = (y/4) * NUM_SHADOW_COL + (x/4);
-  bytenum = bitNum >> 3;//same as dividing by 8...
-  remainder = (bitNum & 0x07) + val; //the lost 3 bits from divison
-  //go remainder number of bits into shadow
-  value = (shadow[bytenum] >> remainder) & 0x01;
-  //outsideHelper3 = value;
-  //outsideHelper2 = 0x01;
-  //outsideHelper = (shadow[bytenum] >> remainder);
-  //writeBinary(2, 10, shadow[bytenum]);
-  return value;
-}
-
-
-byte getchar_vram(byte x, byte y) {
-  // compute VRAM read address
-  word addr = NTADR_A(x,y);
-  // result goes into rd
-  byte rd;
-  // wait for VBLANK to start
-  ppu_wait_nmi();
-  // set vram address and read byte into rd
-  vram_adr(addr);
-  vram_read(&rd, 1);
-  // scroll registers are corrupt
-  // fix by setting vram address
-  vram_adr(0x0);
-  return rd;
 }
 
 void updateMetaSprite(unsigned char attribute, unsigned char * meta)
@@ -527,15 +577,6 @@ void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
 }
 
 
-//sprite char + position...
-
-
-// C0 00 00 
-// 11 00 00 00 00 00 00 00 00 00 00 00
-// 12 tiles from edge
-// pos of 160pixels
-
-
 char groundBlock[6];
 
 // main function, run after console reset
@@ -622,8 +663,12 @@ void main(void) {
 
   worldNumber = 0;
   loadWorld();
-
+  
+  debugDisplayShadow();
+  
   ppu_on_all();
+  while(1)
+  {};
 
   //always updates @ 60fps
   while (1)
@@ -687,21 +732,24 @@ void main(void) {
     */
 
     {
-      res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+2, 1);
-
-      groundBlock[0] = getchar_vram((player.act.x/8), ((player.act.y)/8)+2);
-      groundBlock[1] = getchar_vram((player.act.x/8)+1, ((player.act.y)/8)+2);
-
+      
       if(groundBlock[0] == 0xc1 || groundBlock[1] == 0xc1)
       {
         //pause here!
-        outsideHelper = res;
         outsideHelper2 = checkGround((player.act.x/8), ((player.act.y)/8)+2, 1);
         outsideHelper3 = checkGround((player.act.x/8)+1, ((player.act.y)/8)+2, 1);
         //0x0c, 0x16 = 12, 22
         outsideHelper2 = (player.act.x/8);
         outsideHelper3 = ((player.act.y)/8)+2;
+        outsideHelper4 = SHADOW_SIZE;
       }
+      
+      res = checkGround((player.act.x/8), ((player.act.y)/8)+2, 1) | checkGround((player.act.x/8)+1, ((player.act.y)/8)+2, 1);
+
+      groundBlock[0] = getchar_vram((player.act.x/8), ((player.act.y)/8)+2);
+      groundBlock[1] = getchar_vram((player.act.x/8)+1, ((player.act.y)/8)+2);
+
+      
 
       res2 = res;
 
