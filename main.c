@@ -186,12 +186,7 @@ void setGround(unsigned char x, unsigned char y, byte placeMe)
   //(orignalNumber & 0x??) | (byteToPlace  << remainder);
   //remainder is 0->8
   mask = mask ^ (0x03 << (remainder));
-
-  //writeBinary(2, 8, shadow[bytenum]);
-  //outsideHelper = shadow[bytenum];
   shadow[bytenum] = ((shadow[bytenum] & mask) | (placeMe << remainder));
-  //outsideHelper = shadow[bytenum];
-  //writeBinary(2, 9, shadow[bytenum]);
 }
 
 short checkGround(unsigned char x, unsigned char y, byte val)
@@ -216,11 +211,25 @@ short checkGround(unsigned char x, unsigned char y, byte val)
   outsideHelper2 = shadow[bytenum] >> remainder;
   
   value = (shadow[bytenum] >> remainder) & 0x01;
-  //outsideHelper3 = value;
-  //outsideHelper2 = 0x01;
-  //outsideHelper = (shadow[bytenum] >> remainder);
-  //writeBinary(2, 10, shadow[bytenum]);
   return value;
+}
+
+byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte facingRight, byte collision)
+{
+  //if checking for collision = 1 .. look forward 1 less when lookung right
+  //char infront = checkGround((x/8)+ (facingRight*3 -1), ((y)/8), groundOrBreak);
+  //char infront2 = checkGround((x/8)+ (facingRight*3 -1), ((y)/8)+1, groundOrBreak);
+  char infront = checkGround((x/8)+facingRight, ((y)/8), groundOrBreak)*1;
+  infront = infront + checkGround((x/8)+facingRight, ((y)/8)+1, groundOrBreak)*2;
+
+  infront = infront + checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8), groundOrBreak)*4;
+  infront = infront + checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8)+1, groundOrBreak)*8;
+
+  //outsideHelper = (x/8)+ (facingRight*3 -1);
+  //outsideHelper = (x/8) +facingRight;
+  //outsideHelper2 = ((y)/8)+1;
+  outsideHelper3 = shadow[(outsideHelper2*30*2 + outsideHelper*2) >> 3];
+  return infront;
 }
 
 void loadWorld()
@@ -255,7 +264,7 @@ void loadWorld()
     
     if(currentTile == 0xc4 || currentTile == 0xc5 || currentTile == 0xc6 || currentTile == 0xc7)
     {
-      shadowBits = 0x03;
+      shadowBits = 0x02;
     }
     
     for(i = 0; i < numberOfTimes; i++)
@@ -281,57 +290,37 @@ void loadWorld()
 void debugDisplayShadow()
 {
   
-  int rleInt, x;
+  int rleInt, x, y, ground, breakable;
   vram_adr(NTADR_A(0,0));
   
-  for(rleInt = 0; rleInt < SHADOW_SIZE; rleInt++)
+  for(rleInt = 0; rleInt < LargestWorld; rleInt++)
   {
-    char shadowByte = shadow[rleInt];
+    y = rleInt / NUM_SHADOW_COL; //tileNum / 32 = y value
+    x = rleInt % NUM_SHADOW_COL;
     
-    for(x = 0; x< 4; x++)
+    ground = checkGround(x, y, 0);
+    breakable = checkGround(x, y, 1);
+    
+    if(ground && !breakable)
     {
-      byte currentData = 0x00;
-      if(x == 0)
-      {
-        currentData = (shadowByte & 0xC0) >> 6;
-      }
-      else if(x == 1)
-      {
-        currentData = (shadowByte & 0x30) >> 4;
-      }
-      else if(x == 2)
-      {
-        currentData = (shadowByte & 0x0C) >> 2;
-      }
-      else
-      {
-        currentData = shadowByte & 0x03;
-      }
-      
-      
-      if(currentData == 0x02)
-      {
-        vram_put(0x02);
-      }
-      else if(currentData == 0x03)
-      {
-        vram_put(0x03);
-      }
-      else if(currentData == 0x01)
-      {
-        vram_put(0x01);
-      }
-      else
-      {
-        vram_put(0x00);
-      }
-      
+      vram_put(0x01);
     }
+    else if(breakable && ! ground)
+    {
+      vram_put(0x02);
+    }
+    else if(ground && breakable)
+    {
+      vram_put(0x03);
+    }
+    else
+    {
+      vram_put(0x00);
+    }
+    
+    
   }
 }
-
-
-//define variables here
 
 
 typedef struct Particles
@@ -530,23 +519,7 @@ short rectanglesHit(unsigned char x, unsigned char y, unsigned char width, unsig
 }
 
 
-byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte facingRight, byte collision)
-{
-  //if checking for collision = 1 .. look forward 1 less when lookung right
-  //char infront = checkGround((x/8)+ (facingRight*3 -1), ((y)/8), groundOrBreak);
-  //char infront2 = checkGround((x/8)+ (facingRight*3 -1), ((y)/8)+1, groundOrBreak);
-  char infront = checkGround((x/8)+facingRight, ((y)/8), groundOrBreak)*1;
-  infront = infront + checkGround((x/8)+facingRight, ((y)/8)+1, groundOrBreak)*2;
 
-  infront = infront + checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8), groundOrBreak)*4;
-  infront = infront + checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8)+1, groundOrBreak)*8;
-
-  //outsideHelper = (x/8)+ (facingRight*3 -1);
-  //outsideHelper = (x/8) +facingRight;
-  //outsideHelper2 = ((y)/8)+1;
-  outsideHelper3 = shadow[(outsideHelper2*30*2 + outsideHelper*2) >> 3];
-  return infront;
-}
 
 void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
 {
@@ -653,8 +626,8 @@ void main(void) {
   debugDisplayShadow();
   
   ppu_on_all();
-  while(1)
-  {};
+  //while(1)
+  //{};
 
   //always updates @ 60fps
   while (1)
