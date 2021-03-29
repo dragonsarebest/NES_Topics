@@ -39,14 +39,15 @@ unsigned char name[]={\
 
 #define BYTE_PER_COL 32
 
-#define SHADOW_SIZE (NUM_SHADOW_ROW * NUM_SHADOW_COL)/4
-char shadow[SHADOW_SIZE];
-
 byte outsideHelper; //used for debugging
 byte outsideHelper2;
 byte outsideHelper3;
 byte outsideHelper4;
 byte outsideHelper5;
+
+#define SHADOW_SIZE (NUM_SHADOW_ROW * NUM_SHADOW_COL)/4
+char shadow[SHADOW_SIZE];
+
 byte outsideHelper6;
 
 #define NumWorlds 2
@@ -232,28 +233,28 @@ short checkGround(unsigned char x, unsigned char y, byte val)
   return value;
 }
 
-byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte facingRight)
+byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte facingRight, byte offset)
 {
   byte inFront = 0;
   int collision;
   //if checking for collision = 1 .. look forward 1 less when lookung right
   //char infront = checkGround((x/8)+ (facingRight*3 -1), ((y)/8), groundOrBreak);
   //char infront2 = checkGround((x/8)+ (facingRight*3 -1), ((y)/8)+1, groundOrBreak);
-  
-   if(facingRight)
-   {
-     collision = -2;
-   }
+
+  if(facingRight)
+  {
+    collision = -2;
+  }
   else
   {
     collision = 1;
   }
   // feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
   // feet.act.y = (player.act.y/8) *8;
-  inFront = checkGround(((x/8)+(facingRight*3 - 1) + collision), ((y)/8), groundOrBreak);
+  inFront = checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8), groundOrBreak);
 
-  inFront = inFront | checkGround(((x/8)+(facingRight*3 - 1) + collision), ((y)/8)+1, groundOrBreak) << 1;
-  
+  inFront = inFront | checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8)+1, groundOrBreak) << 1;
+
   if(facingRight)
   {
     collision = -1;
@@ -262,10 +263,10 @@ byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte fac
   {
     collision = 2;
   }
-  
-  inFront = inFront | checkGround(((x/8)+(facingRight*3 - 1) + collision), ((y)/8), groundOrBreak) << 2;
 
-  inFront = inFront | checkGround(((x/8)+(facingRight*3 - 1) + collision), ((y)/8)+1, groundOrBreak) << 3;
+  inFront = inFront | checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8), groundOrBreak) << 2;
+
+  inFront = inFront | checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8)+1, groundOrBreak) << 3;
 
   //inFront = inFront | checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8), groundOrBreak) << 2;
   //inFront = inFront | checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8)+1, groundOrBreak) << 3;
@@ -713,30 +714,30 @@ void main(void) {
     cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
     //cur_oam = 4;
 
-    
+
     player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6) ;
-    res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight);
-    
+    res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, 0);
+
     {
       char dx[32];
       //sprintf(dx, "%d", player.act.dx);
       sprintf(dx, "canWalk: %d", res);
       updateScreen(2, 1, dx, 32);
     }
-    
+
     if(worldScrolling)
     {
       player.act.dx = 0;
     }
-    else if(res != 0 )
+    else if(((res & 0x0C) >> 2) != 0 && lastFacingRight || ((res & 0x03)) != 0 && !lastFacingRight )
     {
       //if(player.act.x%8 != 0)
       //{
       //  player.act.x += (player.act.x%4);
       //}
       int collision;
-      
-      
+
+
       {
         //1,2,4,8 bits 
         //1 & 2 = front 2
@@ -750,16 +751,16 @@ void main(void) {
           }
           else
           {
-             collision = 1;
+            collision = 1;
           }
           player.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision)*8;
         }
       }
-      
+
       player.act.dx = 0;
     }
-    
-     {
+
+    {
       char dx[32];
       sprintf(dx, "x: %d", player.act.x);
       updateScreen(2, 2, dx, 32);
@@ -894,16 +895,153 @@ void main(void) {
 
 
 
+    if(!worldScrolling)
     {
-      breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight);
-
+      byte offset = 1;
+      breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, offset);
+      //1101
       if((breakBlock != 0) && pad_result&0x04)
       {
 
-        int itemX, itemY;
-        byte suitible_option = true;
+        int itemX, itemY, collision;
+        byte suitableOption = true;
         //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
+        
 
+        outsideHelper = res;
+        
+        if(!lastFacingRight)
+        {
+          if(lastFacingRight)
+          {
+            collision = -2;
+          }
+          else
+          {
+            collision = 1;
+          }
+          
+          if((res & 0x02) != 0)
+          {
+            itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+            itemY = player.act.y/8;
+          }
+          else if((res & 0x01) != 0)
+          {
+            itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+            itemY = player.act.y/8 +1;
+          }
+          else
+          {
+            if(lastFacingRight)
+            {
+              collision = -1;
+            }
+            else
+            {
+              collision = 2;
+            }
+
+            if((res & 0x04) != 0)
+            {
+              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+              itemY = player.act.y/8 + 1;
+            }
+            else if((res & 0x08) != 0)
+            {
+              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+              itemY = player.act.y/8;
+            }
+            else
+            {
+              suitableOption = false; 
+            }
+
+          }
+        }
+        else
+        {
+          if(lastFacingRight)
+          {
+            collision = -1;
+          }
+          else
+          {
+            collision = 2;
+          }
+
+          if((res & 0x04) != 0)
+          {
+            itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+            itemY = player.act.y/8 + 1;
+          }
+          else if((res & 0x08) != 0)
+          {
+            itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+            itemY = player.act.y/8;
+          }
+          else
+          {
+            
+            if(lastFacingRight)
+            {
+              collision = -2;
+            }
+            else
+            {
+              collision = 1;
+            }
+
+            if((res & 0x02) != 0)
+            {
+              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+              itemY = player.act.y/8;
+            }
+            else if((res & 0x01) != 0)
+            {
+              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+              itemY = player.act.y/8 +1;
+            }
+            else
+            {
+              suitableOption = false; 
+            }
+
+            
+          }
+        }
+        
+        {
+          char dx[32];
+          //sprintf(dx, "%d", player.act.dx);
+          sprintf(dx, "player: %d %d    ", player.act.x/8, player.act.y/8);
+          updateScreen(2, 10, dx, 32);
+          sprintf(dx, "brick: %d %d      ", itemX, itemY);
+          updateScreen(2, 11, dx, 32);
+        }
+        /*
+
+        // feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
+        // feet.act.y = (player.act.y/8) *8;
+        inFront = checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8), groundOrBreak);
+
+        inFront = inFront | checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8)+1, groundOrBreak) << 1;
+
+        if(facingRight)
+        {
+          collision = -1;
+        }
+        else
+        {
+          collision = 2;
+        }
+
+        inFront = inFront | checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8), groundOrBreak) << 2;
+
+        inFront = inFront | checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8)+1, groundOrBreak) << 3;
+        */
+
+        /*
         if(breakBlock ==  0x01)
         {
           itemX = (player.act.x/8)+lastFacingRight;
@@ -924,12 +1062,9 @@ void main(void) {
           itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
           itemY = ((player.act.y)/8)+1;
         }
-        else
-        {
-          suitible_option = false;
-        }
+        */
 
-        if(suitible_option)
+        if(suitableOption)
         {
           setGround(itemX, itemY, 0);
 
@@ -1129,11 +1264,11 @@ void main(void) {
       feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
       feet.act.y = (player.act.y/8) *8;
       cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
-      
+
       feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
       feet.act.y = ((player.act.y/8) + 1) *8;
       cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-      
+
       if(lastFacingRight)
       {
         collision = -1;
@@ -1142,15 +1277,15 @@ void main(void) {
       {
         collision = 2;
       }
-      
+
       feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
       feet.act.y = (player.act.y/8) *8;
       cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-      
+
       feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
       feet.act.y = (player.act.y/8 + 1) *8;
       cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-      
+
       /*
        inFront = checkGround((x/8)+facingRight, ((y)/8), groundOrBreak);
 
