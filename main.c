@@ -151,6 +151,7 @@ const char worldData[NumWorlds][LargestWorld] = {
 };
 char worldNumber;
 char transition = 0x80; //first bit = right, left, up, down
+byte scrollSwap = false;
 
 byte getchar_vram(byte x, byte y) {
   // compute VRAM read address
@@ -246,8 +247,17 @@ void loadWorld()
   int tileNum;
   int rleInt = 0;
 
-  vram_adr(NTADR_B(0,0));
-
+  if(scrollSwap)
+  {
+    vram_adr(NTADR_A(0,0));
+  }
+  else
+  {
+    vram_adr(NTADR_B(0,0));
+  }
+  
+  scrollSwap = !scrollSwap;
+  
   //maps are using RLE compression!
   for(rleInt = 0; rleInt < LargestWorld;)
   {
@@ -295,7 +305,11 @@ void loadWorld()
     }
   }
 
-  //outsideHelper = checkGround(15, 21, 1);
+  worldNumber = (worldNumber+1);
+  if(worldNumber > NumWorlds)
+  {
+    worldNumber = 0;
+  }
 
 }
 
@@ -575,31 +589,6 @@ void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
   }
 }
 
-int getHeights(int x)
-{
-  int low, high;
-  int y;
-  //4 bytes in a long...
-  //first 4 bits = lower, last 4 = upper
-  for(y = 0; y < NUM_SHADOW_COL; y++)
-  {
-    if(checkGround(x, y, 1) == 0x01)
-    {
-      low = y;
-      break;
-    }
-  }
-  for(y = NUM_SHADOW_COL-1; y >- 0; y--)
-  {
-    if(checkGround(x, y, 1) == 0x01)
-    {
-      high = y;
-      break;
-    }
-  }
-  return (low << 6) | high;
-}
-
 char groundBlock[6];
 
 // main function, run after console reset
@@ -664,7 +653,7 @@ void main(void) {
   worldNumber = 0;
   loadWorld();
 
-  debugDisplayShadow();
+  //debugDisplayShadow();
 
   ppu_on_all();
   //while(1)
@@ -886,50 +875,6 @@ void main(void) {
     if(player.act.grounded && playerInAir)
     {
       
-      /*
-      int itemX, itemY;
-      
-      //1, 2, 4, 8
-      if(res == 1)
-      {
-        itemX = (player.act.x/8)+lastFacingRight;
-        itemY = ((player.act.y)/8);
-      }
-      if(res == 2)
-      {
-        itemX = (player.act.x/8)+lastFacingRight;
-        itemY = ((player.act.y)/8)+1;
-      }
-      if(res == 4)
-      {
-        itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
-        itemY = ((player.act.y)/8);
-      }
-      if(res == 8)
-      {
-        itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
-        itemY = ((player.act.y)/8)+1;
-      }
-      player.act.jumpTimer = 0;
-      if((groundBlock[4] | groundBlock[5]) == false && res == true)
-      {
-        //zoomin... will pass through two blocks in next tick if unstopped
-        player.act.y = (itemY+2)*8;
-      }
-      else
-      {
-        if(!(groundBlock[2] | groundBlock[3]))
-        {
-          //zoomin... will pass through one blocks in next tick if unstopped
-          player.act.y = (itemY+1)*8;
-        }
-        else
-        {
-          player.act.y = (itemY)*8;
-        }
-      }
-      */
-      
       
       int itemY = 0;
       
@@ -943,37 +888,7 @@ void main(void) {
       }
       
       player.act.y = ((player.act.y/8) + itemY)*8;
-      
-      if(player.act.y > 25*8)
-      {
-        player.act.y = 25*8;
-        {
-          char dx[32];
-          sprintf(dx, "PLAYER: %d, %d", player.act.x/8, player.act.y/8);
-          updateScreen(2, 2, dx, 32);
-        }
-      }
-      
-      
-      /*
-      char upper, lower;
-      itemY = getHeights(player.act.x/8);
-      upper = itemY & 0x3F;
-      lower = (itemY & 0xFC0) >> 6;
-      
-      outsideHelper = player.act.y;
-      outsideHelper2 = upper;
-      outsideHelper3 = lower;
-      
-      if(player.act.y/8 > lower)
-      {
-        player.act.y = lower*8;
-      }
-      if(player.act.y/8 < upper)
-      {
-        player.act.y = upper*8;
-      }
-      */
+
       
       player.act.dy = 0;
 
@@ -1069,6 +984,8 @@ void main(void) {
         {
           player.act.x = 8;
           worldScrolling = false;
+          world_x = 0;
+          
         }
       }
     }
