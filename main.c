@@ -155,9 +155,18 @@ byte scrollSwap = false;
 
 byte getchar_vram(byte x, byte y) {
   // compute VRAM read address
-  word addr = NTADR_A(x,y);
-  // result goes into rd
+  word addr;
   byte rd;
+  if(scrollSwap)
+  {
+    addr = NTADR_B(x,y);
+  }
+  else
+  {
+    addr = NTADR_A(x, y);
+  }
+  // result goes into rd
+  
   // wait for VBLANK to start
   ppu_wait_nmi();
   // set vram address and read byte into rd
@@ -359,13 +368,6 @@ typedef struct Particles
   unsigned char sprite;
 } Particles;
 
-typedef struct Destructable
-{
-  unsigned char x;
-  unsigned char y;
-  unsigned char alive;
-  unsigned char sprite;
-} Destructable;
 
 typedef struct Actor
 {
@@ -430,7 +432,15 @@ void updateScreen(unsigned char column, unsigned char row, char * buffer, unsign
 {
   vrambuf_clear();
   set_vram_update(updbuf);
-  vrambuf_put(NTADR_A(column, row), buffer, num_bytes);
+  if(scrollSwap)
+  {
+    vrambuf_put(NTADR_B(column, row), buffer, num_bytes);
+  }
+  else
+  {
+    vrambuf_put(NTADR_A(column, row), buffer, num_bytes);
+  }
+  
   vrambuf_flush();
 }
 
@@ -501,7 +511,12 @@ void writeText(char * data, unsigned char addressX, unsigned char addressY)
   int startIndex = 0;
   int currentIndex = 0;
   //set init address
-  vram_adr(NTADR_A(addressX, addressY));
+  
+  
+  
+  
+
+  
   while(*data)
   {
     //newline = 10
@@ -511,7 +526,14 @@ void writeText(char * data, unsigned char addressX, unsigned char addressY)
       line = data+1;
       startIndex = currentIndex+1;
       addressY++;
-      vram_adr(NTADR_A(addressX, addressY));
+      if(scrollSwap)
+      {
+        vram_adr(NTADR_B(addressX, addressY));
+      }
+      else
+      {
+        vram_adr(NTADR_A(addressX, addressY));
+      }
     }
     currentIndex++;
     data++;
@@ -805,10 +827,8 @@ void main(void) {
       }
 
 
-    /*
+    
     {
-      char closestBrick = 0;
-      int currentClosest = 1000;
       breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
 
       if((breakBlock != 0) && pad_result&0x04)
@@ -836,25 +856,32 @@ void main(void) {
           itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
           itemY = ((player.act.y)/8)+1;
         }
-
-	for(i = 0; i < 32; i++)
+        if(breakBlock == 12)
         {
-          int dist = (destroybois[i].x-itemX)*(destroybois[i].x-itemX) + (destroybois[i].y-itemY)*(destroybois[i].y-itemY);
-          if(dist < currentClosest)
-          {
-            currentClosest = dist;
-            closestBrick = i;
-          }
+          //facing right & have to bricks you can break 2blocks in front of you...
+          itemX = (player.act.x/8)+lastFacingRight*2;
+          itemY = ((player.act.y)/8);
         }
+        if(breakBlock == 15)
+        {
+          //facing left & have to bricks you can break 4blocks in front of you...
+          itemX = (player.act.x/8);
+          itemY = ((player.act.y)/8);
+        }
+
         setGround(itemX, itemY, 0);
-        destroybois[closestBrick].alive = false;
-        //brick.alive = false;
-
-        //delete obj from background...
-
+        
         ppu_off();
-        //ppu_wait_nmi();
-        vram_adr(NTADR_A(itemX, itemY));
+        
+        if(scrollSwap)
+        {
+          vram_adr(NTADR_B(itemX, itemY));
+        }
+        else
+        {
+          vram_adr(NTADR_A(itemX, itemY));
+        }
+        
         vram_put(0x00);
         ppu_on_all();
 
@@ -862,15 +889,15 @@ void main(void) {
         numActive = NUM_BRICKS;
         for(i = 0; i < numActive; i++)
         {
-          singleBricks[closestBrick].lifetime = brickLifetime;
-          singleBricks[closestBrick].x = destroybois[i].x-5;
-          singleBricks[closestBrick].y = destroybois[i].y;
+          singleBricks[i].lifetime = brickLifetime;
+          singleBricks[i].x = itemX*8-5;
+          singleBricks[i].y = itemY*8;
 
         }
 
       }
     }
-    */
+    
 
 
     if(player.act.grounded && playerInAir)
@@ -895,6 +922,7 @@ void main(void) {
 
       playerInAir = false;
       player.act.grounded = false;
+      player.act.jumpTimer = 0;
 
     }
 
@@ -936,6 +964,19 @@ void main(void) {
       updateScreen(2, 7, dx, 32);
     }
     
+    {
+      char dx[32];
+      //sprintf(dx, "%d", player.act.dx);
+      sprintf(dx, "air: %d", playerInAir);
+      updateScreen(2, 8, dx, 32);
+    }
+    
+    {
+      char dx[32];
+      //sprintf(dx, "%d", player.act.dx);
+      sprintf(dx, "timer: %d", player.act.jumpTimer);
+      updateScreen(2, 9, dx, 32);
+    }
     
 
     //scrolling
