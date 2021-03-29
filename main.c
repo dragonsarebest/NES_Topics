@@ -232,24 +232,48 @@ short checkGround(unsigned char x, unsigned char y, byte val)
   return value;
 }
 
-byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte facingRight, byte collision)
+byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte facingRight)
 {
   byte inFront = 0;
+  int collision;
   //if checking for collision = 1 .. look forward 1 less when lookung right
   //char infront = checkGround((x/8)+ (facingRight*3 -1), ((y)/8), groundOrBreak);
   //char infront2 = checkGround((x/8)+ (facingRight*3 -1), ((y)/8)+1, groundOrBreak);
-  inFront = checkGround((x/8)+facingRight, ((y)/8), groundOrBreak);
+  
+   if(facingRight)
+   {
+     collision = -2;
+   }
+  else
+  {
+    collision = 1;
+  }
+  // feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
+  // feet.act.y = (player.act.y/8) *8;
+  inFront = checkGround(((x/8)+(facingRight*3 - 1) + collision), ((y)/8), groundOrBreak);
 
-  inFront = inFront | checkGround((x/8)+facingRight, ((y)/8)+1, groundOrBreak) << 1;
+  inFront = inFront | checkGround(((x/8)+(facingRight*3 - 1) + collision), ((y)/8)+1, groundOrBreak) << 1;
+  
+  if(facingRight)
+  {
+    collision = -1;
+  }
+  else
+  {
+    collision = 2;
+  }
+  
+  inFront = inFront | checkGround(((x/8)+(facingRight*3 - 1) + collision), ((y)/8), groundOrBreak) << 2;
 
-  inFront = inFront | checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8), groundOrBreak) << 2;
-  inFront = inFront | checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8)+1, groundOrBreak) << 3;
+  inFront = inFront | checkGround(((x/8)+(facingRight*3 - 1) + collision), ((y)/8)+1, groundOrBreak) << 3;
 
-  //outsideHelper = (x/8)+ (facingRight*3 -1);
-  //outsideHelper = (x/8) +facingRight;
-  //outsideHelper2 = ((y)/8)+1;
+  //inFront = inFront | checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8), groundOrBreak) << 2;
+  //inFront = inFront | checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8)+1, groundOrBreak) << 3;
+
   return inFront;
 }
+
+
 
 void loadWorld()
 { 
@@ -395,7 +419,6 @@ typedef struct MetaActor
   Actor act;
   unsigned char * metasprite;
 } MetaActor;
-
 
 int world_x = 0;
 int world_y = 0;
@@ -637,7 +660,7 @@ void main(void) {
 
   unsigned int i = 0, j = 0;
 
-  char debugCheck = false;
+  char debugCheck = true;
   char worldScrolling = false;
 
   worldScrolling = true;
@@ -690,14 +713,56 @@ void main(void) {
     cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
     //cur_oam = 4;
 
-    res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, -1);
-    if(res == 0)
+    
+    player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6) ;
+    res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight);
+    
     {
-      player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6) ;
+      char dx[32];
+      //sprintf(dx, "%d", player.act.dx);
+      sprintf(dx, "canWalk: %d", res);
+      updateScreen(2, 1, dx, 32);
     }
-    else
+    
+    if(worldScrolling)
     {
       player.act.dx = 0;
+    }
+    else if(res != 0 )
+    {
+      //if(player.act.x%8 != 0)
+      //{
+      //  player.act.x += (player.act.x%4);
+      //}
+      int collision;
+      
+      
+      {
+        //1,2,4,8 bits 
+        //1 & 2 = front 2
+        //4 & 8 = back 2
+        if(((res & 0x0C) >> 2) > 0)
+        {
+          //meaning we're moving right and the player's front 2 blocks are IN ground block...
+          if(lastFacingRight)
+          {
+            collision = -2;
+          }
+          else
+          {
+             collision = 1;
+          }
+          player.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision)*8;
+        }
+      }
+      
+      player.act.dx = 0;
+    }
+    
+     {
+      char dx[32];
+      sprintf(dx, "x: %d", player.act.x);
+      updateScreen(2, 2, dx, 32);
     }
 
     res = 0;
@@ -830,7 +895,7 @@ void main(void) {
 
 
     {
-      breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, 0);
+      breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight);
 
       if((breakBlock != 0) && pad_result&0x04)
       {
@@ -844,7 +909,7 @@ void main(void) {
           itemX = (player.act.x/8)+lastFacingRight;
           itemY = ((player.act.y)/8);
         }
-        else if(breakBlock == 0x02)
+        else if(breakBlock == 0x02 || breakBlock == 0x0F || breakBlock == 0x03 || breakBlock == 0x0A)
         {
           itemX = (player.act.x/8)+lastFacingRight;
           itemY = ((player.act.y)/8)+1;
@@ -857,14 +922,6 @@ void main(void) {
         else if(breakBlock == 0x08)
         {
           itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
-          itemY = ((player.act.y)/8)+1;
-        }
-        else if(breakBlock == 0x0F || breakBlock == 0x03 || breakBlock == 0x0A)
-        {
-          //two blocks in front  & standing in two blocks you can also break,
-          //standing in two blocks you can also break,
-          //standing in one block you can also break
-          itemX = (player.act.x/8)+lastFacingRight;
           itemY = ((player.act.y)/8)+1;
         }
         else
@@ -1060,6 +1117,49 @@ void main(void) {
 
     if(debugCheck)
     {
+      int collision = 0;
+      if(lastFacingRight)
+      {
+        collision = -2;
+      }
+      else
+      {
+        collision = 1;
+      }
+      feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
+      feet.act.y = (player.act.y/8) *8;
+      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
+      
+      feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
+      feet.act.y = ((player.act.y/8) + 1) *8;
+      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
+      
+      if(lastFacingRight)
+      {
+        collision = -1;
+      }
+      else
+      {
+        collision = 2;
+      }
+      
+      feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
+      feet.act.y = (player.act.y/8) *8;
+      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
+      
+      feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
+      feet.act.y = (player.act.y/8 + 1) *8;
+      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
+      
+      /*
+       inFront = checkGround((x/8)+facingRight, ((y)/8), groundOrBreak);
+
+      inFront = inFront | checkGround((x/8)+facingRight, ((y)/8)+1, groundOrBreak) << 1;
+
+      inFront = inFront | checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8), groundOrBreak) << 2;
+      inFront = inFront | checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8)+1, groundOrBreak) << 3;
+      */
+      /*
       feet.act.x = player.act.x;
       feet.act.y = player.act.y + 8*3;
       cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
@@ -1067,6 +1167,8 @@ void main(void) {
       feet.act.x = player.act.x+8;
       feet.act.y = player.act.y + 8*3;
       cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
+      */
+      //draw falling hitbix
     }
 
     oam_hide_rest(cur_oam);
