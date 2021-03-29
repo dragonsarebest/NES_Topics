@@ -305,11 +305,7 @@ void loadWorld()
     }
   }
 
-  worldNumber = (worldNumber+1);
-  if(worldNumber > NumWorlds)
-  {
-    worldNumber = 0;
-  }
+  worldNumber = (worldNumber+1)%NumWorlds;
 
 }
 
@@ -618,7 +614,7 @@ void main(void) {
 
   unsigned int i = 0, j = 0;
 
-  char debugCheck = true;
+  char debugCheck = false;
   char worldScrolling = false;
   
   worldScrolling = true;
@@ -671,11 +667,6 @@ void main(void) {
     cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
     //cur_oam = 4;
 
-    for(i = 0; i < 6; i++)
-    {
-      groundBlock[0] =  0x00;
-    }
-
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, -1);
     if(res == 0)
     {
@@ -722,23 +713,33 @@ void main(void) {
     
     for(i = 0; i < 6; i++)
     {
-      groundBlock[i] = checkGround((player.act.x/8) + (i%2), ((player.act.y)/8)+2 + (i/2), 1);
-      writeBinary(2, 8+i, groundBlock[i]);
+      
+      if(i >= 4 && player.act.dy == 0)
+      {
+        groundBlock[i] = 0;
+      }
+      else
+      {
+        if(!(player.act.dy > 0 && playerInAir) && (i == 2 || i == 3))
+        {
+          groundBlock[i] = 0;
+        }
+        else if(! (player.act.dy * player.act.jumpSpeed >= 8) && (i == 4 || i == 5))
+        {
+          groundBlock[i] = 0;
+        }
+        else
+        {
+          groundBlock[i] = checkGround((player.act.x/8) + (i%2), ((player.act.y)/8)+2 + (i/2), 1);
+        }
+        
+      }
+      //writeBinary(2, 8+i, groundBlock[i]);
+      
+      res = res | groundBlock[i];
     }
     
-    res = groundBlock[0] | groundBlock[1];
-    
-    if(player.act.dy > 0 && playerInAir)
-    {
-      res = res | groundBlock[2] | groundBlock[3];
-      //we are falling check one tile lower...
-    }
-    
-    if(player.act.dy * player.act.jumpSpeed >= 8)
-    {
-      res = res | groundBlock[4] | groundBlock[5];
-      //we are falling faster than 1 block a tick!
-    }
+    //res = groundBlock[0] | groundBlock[1];
 
     if(res != 0)
     {
