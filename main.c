@@ -349,7 +349,17 @@ void debugDisplayShadow()
 {
 
   int rleInt, x, y, ground, breakable;
-  vram_adr(NTADR_A(0,0));
+  
+  ppu_off();
+  
+  if(scrollSwap)
+  {
+    vram_adr(NTADR_B(0,0));
+  }
+  else
+  {
+    vram_adr(NTADR_A(0,0));
+  }
 
   for(rleInt = 0; rleInt < LargestWorld; rleInt++)
   {
@@ -379,6 +389,7 @@ void debugDisplayShadow()
 
 
   }
+  ppu_on_all();
 }
 
 
@@ -537,11 +548,6 @@ void writeText(char * data, unsigned char addressX, unsigned char addressY)
   int currentIndex = 0;
   //set init address
 
-
-
-
-
-
   while(*data)
   {
     //newline = 10
@@ -661,7 +667,7 @@ void main(void) {
 
   unsigned int i = 0, j = 0;
 
-  char debugCheck = true;
+  char debugCheck = false;
   char worldScrolling = false;
 
   worldScrolling = true;
@@ -908,56 +914,26 @@ void main(void) {
         //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
         
 
-        outsideHelper = res;
+        outsideHelper = breakBlock;
         
-        if(!lastFacingRight)
+        if(lastFacingRight)
         {
-          if(lastFacingRight)
-          {
-            collision = -2;
-          }
-          else
-          {
-            collision = 1;
-          }
-          
-          if((res & 0x02) != 0)
-          {
-            itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-            itemY = player.act.y/8;
-          }
-          else if((res & 0x01) != 0)
-          {
-            itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-            itemY = player.act.y/8 +1;
-          }
-          else
-          {
-            if(lastFacingRight)
-            {
-              collision = -1;
-            }
-            else
-            {
-              collision = 2;
-            }
+          collision = -2;
+        }
+        else
+        {
+          collision = 1;
+        }
 
-            if((res & 0x04) != 0)
-            {
-              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-              itemY = player.act.y/8 + 1;
-            }
-            else if((res & 0x08) != 0)
-            {
-              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-              itemY = player.act.y/8;
-            }
-            else
-            {
-              suitableOption = false; 
-            }
-
-          }
+        if((breakBlock & 0x02) != 0)
+        {
+          itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+          itemY = player.act.y/8 + 1;
+        }
+        else if((breakBlock & 0x01) != 0)
+        {
+          itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+          itemY = player.act.y/8;
         }
         else
         {
@@ -969,48 +945,22 @@ void main(void) {
           {
             collision = 2;
           }
-
-          if((res & 0x04) != 0)
+          
+          if((breakBlock & 0x08) != 0)
           {
             itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
             itemY = player.act.y/8 + 1;
           }
-          else if((res & 0x08) != 0)
+          else if((breakBlock & 0x04) != 0)
           {
             itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
             itemY = player.act.y/8;
           }
           else
           {
-            
-            if(lastFacingRight)
-            {
-              collision = -2;
-            }
-            else
-            {
-              collision = 1;
-            }
-
-            if((res & 0x02) != 0)
-            {
-              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-              itemY = player.act.y/8;
-            }
-            else if((res & 0x01) != 0)
-            {
-              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-              itemY = player.act.y/8 +1;
-            }
-            else
-            {
-              suitableOption = false; 
-            }
-
-            
+            suitableOption = false; 
           }
         }
-        
         {
           char dx[32];
           //sprintf(dx, "%d", player.act.dx);
@@ -1221,6 +1171,10 @@ void main(void) {
 
         if(world_x >= 256)
         {
+          if(debugCheck)
+          {
+            debugDisplayShadow();
+          }
           player.act.x = 8;
           worldScrolling = false;
           world_x = 0;
@@ -1252,6 +1206,7 @@ void main(void) {
 
     if(debugCheck)
     {
+      
       int collision = 0;
       if(lastFacingRight)
       {
@@ -1285,25 +1240,7 @@ void main(void) {
       feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
       feet.act.y = (player.act.y/8 + 1) *8;
       cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-
-      /*
-       inFront = checkGround((x/8)+facingRight, ((y)/8), groundOrBreak);
-
-      inFront = inFront | checkGround((x/8)+facingRight, ((y)/8)+1, groundOrBreak) << 1;
-
-      inFront = inFront | checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8), groundOrBreak) << 2;
-      inFront = inFront | checkGround((x/8)+(facingRight*3 - 1 - collision*(!facingRight)), ((y)/8)+1, groundOrBreak) << 3;
-      */
-      /*
-      feet.act.x = player.act.x;
-      feet.act.y = player.act.y + 8*3;
-      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-
-      feet.act.x = player.act.x+8;
-      feet.act.y = player.act.y + 8*3;
-      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
-      */
-      //draw falling hitbix
+      
     }
 
     oam_hide_rest(cur_oam);
