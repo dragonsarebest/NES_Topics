@@ -438,6 +438,9 @@ int world_y = 0;
 DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
 MetaActor player;
 
+DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_1, 0xE0, 0);
+DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_2, 0xE4, 0);
+
 DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xDC, 0);
 
 char PALETTE[32] = 
@@ -654,6 +657,7 @@ void main(void) {
   byte lastFacingRight = true;
   byte playerInAir = true; //since we start off the ground
   byte run = 0;
+  byte swing = 0;
 
   //Destructable destroybois[32];
   //Destructable brick;
@@ -686,7 +690,7 @@ void main(void) {
   player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
 
   player.act.alive = true;
-  player.act.moveSpeed = 5;
+  player.act.moveSpeed = 2;
   player.act.jumpSpeed = 3;
   player.act.grounded = true;
 
@@ -871,6 +875,8 @@ void main(void) {
       player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
       updateMetaSprite(player.act.attribute, PlayerMetaSprite);
       updateMetaSprite(player.act.attribute, PlayerMetaSprite_Run);
+      updateMetaSprite(player.act.attribute, PlayerMetaSprite_Attack_1);
+      updateMetaSprite(player.act.attribute, PlayerMetaSprite_Attack_2);
     }
 
 
@@ -908,6 +914,10 @@ void main(void) {
       byte offset = 1;
       breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, offset);
       //1101
+      if(pad_result&0x04)
+      {
+        swing = 1;
+      }
       if((breakBlock != 0) && pad_result&0x04)
       {
 
@@ -973,50 +983,6 @@ void main(void) {
           sprintf(dx, "brick: %d %d      ", itemX, itemY);
           updateScreen(2, 11, dx, 32);
         }
-        /*
-
-        // feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
-        // feet.act.y = (player.act.y/8) *8;
-        inFront = checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8), groundOrBreak);
-
-        inFront = inFront | checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8)+1, groundOrBreak) << 1;
-
-        if(facingRight)
-        {
-          collision = -1;
-        }
-        else
-        {
-          collision = 2;
-        }
-
-        inFront = inFront | checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8), groundOrBreak) << 2;
-
-        inFront = inFront | checkGround(((x/8 + offset)+(facingRight*3 - 1) + collision), ((y)/8)+1, groundOrBreak) << 3;
-        */
-
-        /*
-        if(breakBlock ==  0x01)
-        {
-          itemX = (player.act.x/8)+lastFacingRight;
-          itemY = ((player.act.y)/8);
-        }
-        else if(breakBlock == 0x02 || breakBlock == 0x0F || breakBlock == 0x03 || breakBlock == 0x0A)
-        {
-          itemX = (player.act.x/8)+lastFacingRight;
-          itemY = ((player.act.y)/8)+1;
-        }
-        else if(breakBlock == 0x04 || breakBlock == 0x0D)
-        {
-          itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
-          itemY = ((player.act.y)/8);
-        }
-        else if(breakBlock == 0x08)
-        {
-          itemX = (player.act.x/8)+(lastFacingRight*3 - 1);
-          itemY = ((player.act.y)/8)+1;
-        }
-        */
 
         if(suitableOption)
         {
@@ -1187,23 +1153,40 @@ void main(void) {
     }
 
 
-
-    if(player.act.dx != 0 && player.act.grounded && !worldScrolling)
+    
+    if(swing == 1)
     {
-      if(run == 1)
+      cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_1);
+      ppu_wait_frame();
+      ppu_wait_frame();
+      swing = 2;
+    }
+    else if(swing == 2) 
+    {
+      cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_2);
+      ppu_wait_frame();
+      ppu_wait_frame();
+      swing = 0; 
+    }
+    else
+    {
+      if(player.act.dx != 0 && player.act.grounded && !worldScrolling)
       {
-        cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
-        run = 0;
+        if(run == 1)
+        {
+          cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
+          run = 0;
+        }
+        else
+        {
+          cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
+          run++;
+        }
       }
       else
       {
         cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
-        run++;
       }
-    }
-    else
-    {
-      cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
     }
 
 
