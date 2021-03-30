@@ -724,6 +724,7 @@ void main(void) {
     player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6) ;
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, 0);
 
+    if(debugCheck)
     {
       char dx[32];
       //sprintf(dx, "%d", player.act.dx);
@@ -766,6 +767,7 @@ void main(void) {
       player.act.dx = 0;
     }
 
+    if(debugCheck)
     {
       char dx[32];
       sprintf(dx, "x: %d", player.act.x);
@@ -961,6 +963,8 @@ void main(void) {
             suitableOption = false; 
           }
         }
+        
+        if(debugCheck)
         {
           char dx[32];
           //sprintf(dx, "%d", player.act.dx);
@@ -1096,35 +1100,33 @@ void main(void) {
 
     //debug
 
+    if(debugCheck)
     {
       char dx[32];
-      sprintf(dx, "grounded: %d", player.act.grounded);
+      sprintf(dx, "grounded: %d   ", player.act.grounded);
       updateScreen(2, 6, dx, 32);
-    }
 
-    writeBinary(2, 5, pad_result);
 
-    {
-      char dx[32];
+      writeBinary(2, 5, pad_result);
+
+
       //sprintf(dx, "%d", player.act.dx);
       sprintf(dx, "break block: %d", breakBlock);
       updateScreen(2, 7, dx, 32);
-    }
 
-    {
-      char dx[32];
+
+
       //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "air: %d", playerInAir);
+      sprintf(dx, "air: %d        ", playerInAir);
       updateScreen(2, 8, dx, 32);
-    }
 
-    {
-      char dx[32];
+
+
       //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "timer: %d", player.act.jumpTimer);
+      sprintf(dx, "timer: %d      ", player.act.jumpTimer);
       updateScreen(2, 9, dx, 32);
-    }
 
+    }
 
     //scrolling
     {
@@ -1175,6 +1177,7 @@ void main(void) {
           {
             debugDisplayShadow();
           }
+          
           player.act.x = 8;
           worldScrolling = false;
           world_x = 0;
