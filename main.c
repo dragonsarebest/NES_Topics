@@ -154,10 +154,9 @@ char worldNumber;
 char transition = 0x80; //first bit = right, left, up, down
 byte scrollSwap = false;
 
-byte getchar_vram(byte x, byte y) {
-  // compute VRAM read address
+word setVRAMAddress(int x, int y, byte setNow )
+{
   word addr;
-  byte rd;
   if(scrollSwap)
   {
     addr = NTADR_B(x,y);
@@ -166,6 +165,19 @@ byte getchar_vram(byte x, byte y) {
   {
     addr = NTADR_A(x, y);
   }
+  if(setNow)
+  {
+    vram_adr(addr);
+  }
+  return addr;
+}
+
+byte getchar_vram(byte x, byte y) {
+  // compute VRAM read address
+  word addr;
+  byte rd;
+
+  addr = setVRAMAddress(x, y, false);
   // result goes into rd
 
   // wait for VBLANK to start
@@ -274,6 +286,23 @@ byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte fac
   return inFront;
 }
 
+byte aboveOrBellowPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte above)
+{
+  byte inFront = 0;
+  int deltaY = 0;
+  if(above)
+  {
+    deltaY = -1;
+  }
+  else
+  {
+    deltaY = 2;
+  }
+  inFront = checkGround((x/8), (y/8) + deltaY, groundOrBreak);
+  inFront = inFront | checkGround((x/8)+1, (y/8) + deltaY, groundOrBreak) << 1;
+  return inFront;
+}
+
 
 
 void loadWorld()
@@ -282,16 +311,8 @@ void loadWorld()
   int tileNum;
   int rleInt = 0;
 
-  if(scrollSwap)
-  {
-    vram_adr(NTADR_A(0,0));
-  }
-  else
-  {
-    vram_adr(NTADR_B(0,0));
-  }
-
   scrollSwap = !scrollSwap;
+  setVRAMAddress(0, 0, true);
 
   //maps are using RLE compression!
   for(rleInt = 0; rleInt < LargestWorld;)
@@ -349,17 +370,10 @@ void debugDisplayShadow()
 {
 
   int rleInt, x, y, ground, breakable;
-  
+
   ppu_off();
-  
-  if(scrollSwap)
-  {
-    vram_adr(NTADR_B(0,0));
-  }
-  else
-  {
-    vram_adr(NTADR_A(0,0));
-  }
+
+  setVRAMAddress(0, 0, true);
 
   for(rleInt = 0; rleInt < LargestWorld; rleInt++)
   {
@@ -440,6 +454,8 @@ MetaActor player;
 
 DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_1, 0xE0, 0);
 DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_2, 0xE4, 0);
+
+DEF_METASPRITE_2x2(PlayerMetaSprite_Jump, 0xE8, 0);
 
 DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xDC, 0);
 
@@ -560,14 +576,7 @@ void writeText(char * data, unsigned char addressX, unsigned char addressY)
       line = data+1;
       startIndex = currentIndex+1;
       addressY++;
-      if(scrollSwap)
-      {
-        vram_adr(NTADR_B(addressX, addressY));
-      }
-      else
-      {
-        vram_adr(NTADR_A(addressX, addressY));
-      }
+      setVRAMAddress(addressX, addressY, true);
     }
     currentIndex++;
     data++;
@@ -641,6 +650,15 @@ void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
   }
 }
 
+void updatePlayerSprites()
+{
+  updateMetaSprite(player.act.attribute, PlayerMetaSprite);
+  updateMetaSprite(player.act.attribute, PlayerMetaSprite_Run);
+  updateMetaSprite(player.act.attribute, PlayerMetaSprite_Attack_1);
+  updateMetaSprite(player.act.attribute, PlayerMetaSprite_Attack_2);
+  updateMetaSprite(player.act.attribute, PlayerMetaSprite_Jump);
+}
+
 char groundBlock[6];
 
 // main function, run after console reset
@@ -658,6 +676,8 @@ void main(void) {
   byte playerInAir = true; //since we start off the ground
   byte run = 0;
   byte swing = 0;
+  byte timeBetweenFall = 10;
+  byte fallTimer = 0;
 
   //Destructable destroybois[32];
   //Destructable brick;
@@ -690,7 +710,7 @@ void main(void) {
   player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
 
   player.act.alive = true;
-  player.act.moveSpeed = 2;
+  player.act.moveSpeed = 1;
   player.act.jumpSpeed = 3;
   player.act.grounded = true;
 
@@ -854,6 +874,7 @@ void main(void) {
         //start falling! we walk off a block and dont jump
         player.act.jumpTimer = MAX_JUMP/2;
         playerInAir = true;
+        fallTimer = 0;
       }
     }
 
@@ -873,10 +894,7 @@ void main(void) {
     }
     {
       player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
-      updateMetaSprite(player.act.attribute, PlayerMetaSprite);
-      updateMetaSprite(player.act.attribute, PlayerMetaSprite_Run);
-      updateMetaSprite(player.act.attribute, PlayerMetaSprite_Attack_1);
-      updateMetaSprite(player.act.attribute, PlayerMetaSprite_Attack_2);
+      updatePlayerSprites();
     }
 
 
@@ -911,110 +929,105 @@ void main(void) {
 
     if(!worldScrolling)
     {
-      byte offset = 1;
-      breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, offset);
-      //1101
-      if(pad_result&0x04)
+      if(swing == 0)
       {
-        swing = 1;
-      }
-      if((breakBlock != 0) && pad_result&0x04)
-      {
+        byte offset = 1;
+        breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, offset);
+        //1101
+        if(pad_result&0x04)
+        {
+          swing = 1;
+        }
+        if((breakBlock != 0) && pad_result&0x04)
+        {
 
-        int itemX, itemY, collision;
-        byte suitableOption = true;
-        //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
-        
+          int itemX, itemY, collision;
+          byte suitableOption = true;
+          //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
 
-        outsideHelper = breakBlock;
-        
-        if(lastFacingRight)
-        {
-          collision = -2;
-        }
-        else
-        {
-          collision = 1;
-        }
 
-        if((breakBlock & 0x02) != 0)
-        {
-          itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-          itemY = player.act.y/8 + 1;
-        }
-        else if((breakBlock & 0x01) != 0)
-        {
-          itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-          itemY = player.act.y/8;
-        }
-        else
-        {
+          outsideHelper = breakBlock;
+
           if(lastFacingRight)
           {
-            collision = -1;
+            collision = -2;
           }
           else
           {
-            collision = 2;
+            collision = 1;
           }
-          
-          if((breakBlock & 0x08) != 0)
+
+          if((breakBlock & 0x02) != 0)
           {
             itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
             itemY = player.act.y/8 + 1;
           }
-          else if((breakBlock & 0x04) != 0)
+          else if((breakBlock & 0x01) != 0)
           {
             itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
             itemY = player.act.y/8;
           }
           else
           {
-            suitableOption = false; 
-          }
-        }
-        
-        if(debugCheck)
-        {
-          char dx[32];
-          //sprintf(dx, "%d", player.act.dx);
-          sprintf(dx, "player: %d %d    ", player.act.x/8, player.act.y/8);
-          updateScreen(2, 10, dx, 32);
-          sprintf(dx, "brick: %d %d      ", itemX, itemY);
-          updateScreen(2, 11, dx, 32);
-        }
+            if(lastFacingRight)
+            {
+              collision = -1;
+            }
+            else
+            {
+              collision = 2;
+            }
 
-        if(suitableOption)
-        {
-          setGround(itemX, itemY, 0);
-
-          ppu_off();
-
-          if(scrollSwap)
-          {
-            vram_adr(NTADR_B(itemX, itemY));
-          }
-          else
-          {
-            vram_adr(NTADR_A(itemX, itemY));
+            if((breakBlock & 0x08) != 0)
+            {
+              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+              itemY = player.act.y/8 + 1;
+            }
+            else if((breakBlock & 0x04) != 0)
+            {
+              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+              itemY = player.act.y/8;
+            }
+            else
+            {
+              suitableOption = false; 
+            }
           }
 
-          vram_put(0x00);
-          ppu_on_all();
-
-
-          numActive = NUM_BRICKS;
-          for(i = 0; i < numActive; i++)
+          if(debugCheck)
           {
-            singleBricks[i].lifetime = brickLifetime;
-            singleBricks[i].x = itemX*8-5;
-            singleBricks[i].y = itemY*8;
+            char dx[32];
+            //sprintf(dx, "%d", player.act.dx);
+            sprintf(dx, "player: %d %d    ", player.act.x/8, player.act.y/8);
+            updateScreen(2, 10, dx, 32);
+            sprintf(dx, "brick: %d %d      ", itemX, itemY);
+            updateScreen(2, 11, dx, 32);
+          }
 
+          if(suitableOption)
+          {
+            setGround(itemX, itemY, 0);
+
+            ppu_off();
+
+            setVRAMAddress(itemX, itemY, true);
+
+            vram_put(0x00);
+            ppu_on_all();
+
+
+            numActive = NUM_BRICKS;
+            for(i = 0; i < numActive; i++)
+            {
+              singleBricks[i].lifetime = brickLifetime;
+              singleBricks[i].x = itemX*8-5;
+              singleBricks[i].y = itemY*8;
+
+            }
           }
         }
       }
     }
-
 
 
     if(player.act.grounded && playerInAir)
@@ -1038,7 +1051,7 @@ void main(void) {
       player.act.dy = 0;
 
       playerInAir = false;
-      player.act.grounded = false;
+      //player.act.grounded = false;
       player.act.jumpTimer = 0;
 
     }
@@ -1052,17 +1065,29 @@ void main(void) {
         player.act.dy = jumpTable[player.act.jumpTimer];
         player.act.jumpTimer++;
         playerInAir = true;
+        fallTimer = 0;
       }
 
     }
 
+
     if(playerInAir && !player.act.grounded)
     {
-      //going up or down in the air
-      player.act.dy = jumpTable[player.act.jumpTimer];
-      if(player.act.jumpTimer != MAX_JUMP-1)
-        player.act.jumpTimer++;
+      
+      if(fallTimer == 0)
+      {
+        
+        //going up or down in the air
+        player.act.dy = jumpTable[player.act.jumpTimer];
+        if(player.act.jumpTimer != MAX_JUMP-1)
+          player.act.jumpTimer++;
+      }
+
+      fallTimer++;
+      fallTimer = fallTimer%timeBetweenFall;
+      
     }
+
 
     //debug
 
@@ -1143,7 +1168,7 @@ void main(void) {
           {
             debugDisplayShadow();
           }
-          
+
           player.act.x = 8;
           worldScrolling = false;
           world_x = 0;
@@ -1153,46 +1178,68 @@ void main(void) {
     }
 
 
-    
-    if(swing == 1)
     {
-      cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_1);
-      ppu_wait_frame();
-      ppu_wait_frame();
-      swing = 2;
-    }
-    else if(swing == 2) 
-    {
-      cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_2);
-      ppu_wait_frame();
-      ppu_wait_frame();
-      swing = 0; 
-    }
-    else
-    {
-      if(player.act.dx != 0 && player.act.grounded && !worldScrolling)
+      //animate the player!
+      byte shoudlRun = true;
+      if(swing != 0)
       {
-        if(run == 1)
+        shoudlRun = false;
+        if( swing < 4)
         {
-          cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
-          run = 0;
+          cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_1);
+          ppu_wait_frame();
+          ppu_wait_frame();
+          swing++;
+        }
+        else if(swing >= 4 && swing < 8) 
+        {
+          cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_2);
+          ppu_wait_frame();
+          ppu_wait_frame();
+          swing++; 
+        }
+        else
+        {
+          swing = 0;
+          shoudlRun = true;
+        }
+      }
+
+      if(shoudlRun)
+      {
+        if(playerInAir)
+        {
+          cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Jump);
+        }
+        else if(player.act.dx != 0 && player.act.grounded && !worldScrolling)
+        {
+          if(run < 4)
+          {
+            cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
+            run++;
+          }
+          else if (run >= 4 && run < 8)
+          {
+            cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
+            run++;
+          }
+          else
+          {
+            cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
+            run = 0;
+          }
         }
         else
         {
           cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
-          run++;
         }
       }
-      else
-      {
-        cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
-      }
-    }
 
+    }
 
     if(debugCheck)
     {
-      
+
       int collision = 0;
       if(lastFacingRight)
       {
@@ -1226,7 +1273,7 @@ void main(void) {
       feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
       feet.act.y = (player.act.y/8 + 1) *8;
       cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-      
+
     }
 
     oam_hide_rest(cur_oam);
