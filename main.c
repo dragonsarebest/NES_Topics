@@ -286,10 +286,11 @@ byte searchPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte fac
   return inFront;
 }
 
-byte aboveOrBellowPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte above)
+byte aboveOrBellowPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte above, byte lastFacingRight)
 {
   byte inFront = 0;
   int deltaY = 0;
+  int deltaX = 0;
   if(above)
   {
     deltaY = -1;
@@ -298,8 +299,22 @@ byte aboveOrBellowPlayer(unsigned char x, unsigned char y, byte groundOrBreak, b
   {
     deltaY = 2;
   }
-  inFront = checkGround((x/8), (y/8) + deltaY, groundOrBreak);
-  inFront = inFront | checkGround((x/8)+1, (y/8) + deltaY, groundOrBreak) << 1;
+  if(x % 8 != 0)
+  {
+    if(lastFacingRight)
+    {
+      deltaX = 1;
+    }
+  }
+  else
+  {
+    if(!lastFacingRight)
+    {
+      deltaX = 1;
+    }
+  }
+  inFront = checkGround((x/8) + deltaX, (y/8) + deltaY, groundOrBreak);
+  inFront = inFront | checkGround((x/8) + 1 + deltaX, (y/8) + deltaY, groundOrBreak) << 1;
   return inFront;
 }
 
@@ -1237,6 +1252,9 @@ void main(void) {
 
     }
 
+   
+    //minning debug
+    /*
     if(debugCheck)
     {
 
@@ -1274,6 +1292,59 @@ void main(void) {
       feet.act.y = (player.act.y/8 + 1) *8;
       cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
 
+    }
+    */
+    
+    //jumping debug
+    {
+      /*
+      byte aboveOrBellowPlayer(unsigned char x, unsigned char y, byte groundOrBreak, byte above)
+      {
+        byte inFront = 0;
+        int deltaY = 0;
+        if(above)
+        {
+          deltaY = -1;
+        }
+        else
+        {
+          deltaY = 2;
+        }
+        inFront = checkGround((x/8), (y/8) + deltaY, groundOrBreak);
+        inFront = inFront | checkGround((x/8)+1, (y/8) + deltaY, groundOrBreak) << 1;
+        return inFront;
+      }
+      */
+      byte above = true;
+      int deltaY = 0;
+      int deltaX = 0;
+      if(above)
+      {
+        deltaY = -1;
+      }
+      else
+      {
+        deltaY = 2;
+      }
+      if(player.act.x % 8 != 0)
+      {
+        if(lastFacingRight)
+        {
+          deltaX = 1;
+        }
+      }
+      else
+      {
+        if(!lastFacingRight)
+        {
+          deltaX = 1;
+        }
+      }
+      feet.act.x = (player.act.x/8 + deltaX)* 8;
+      feet.act.y = (player.act.y/8 + deltaY) * 8;
+      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
+      feet.act.x += 8;
+      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
     }
 
     oam_hide_rest(cur_oam);
