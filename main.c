@@ -364,21 +364,77 @@ byte countUp(char lookForMe, byte useDoorLocation, char * DoorInfo)
   return count;
 }
 
+void updateScreen(unsigned char column, unsigned char row, char * buffer, unsigned char num_bytes)
+{
+  vrambuf_clear();
+  set_vram_update(updbuf);
+  if(scrollSwap)
+  {
+    vrambuf_put(NTADR_B(column, row), buffer, num_bytes);
+  }
+  else
+  {
+    vrambuf_put(NTADR_A(column, row), buffer, num_bytes);
+  }
+
+  vrambuf_flush();
+}
+
+void writeBinary(unsigned char x, unsigned char y, byte value)
+{
+  char dx[16];
+  //sprintf(dx, "%d", player.act.dx);
+  sprintf(dx, "%d %d %d %d %d %d %d %d", (value&0x80)>>7, (value&0x40)>>6, (value&0x20) >>5, (value&0x10)>>4, (value&0x08)>>3, (value&0x04)>>2, (value&0x02)>>1, value&0x01);
+  updateScreen(x, y, dx, 16);
+}
+
+void debugnameTable()
+{
+  char dx[32];
+  word addr;
+
+  if(!scrollSwap)
+  {
+    addr = NTADR_A(0,0);
+    sprintf(dx, "NametableA: %d   ", addr);
+    updateScreen(2, 6, dx, 32);
+  }
+  if(scrollSwap)
+  {
+    addr = NTADR_B(0,0); 
+    sprintf(dx, "NametableB: %d   ", addr);
+    updateScreen(2, 7, dx, 32);
+  }
+
+
+  sprintf(dx, "world #: %d        ", worldNumber);
+  updateScreen(2, 5, dx, 32);
+
+  sprintf(dx, "scrollSwap: %d     ", scrollSwap);
+  updateScreen(2, 4, dx, 32);
+    
+}
+
 
 void loadWorld()
 { 
-  int i;
-  int tileNum;
+  int i = 0;
+  int tileNum;// = 0;
   int rleInt = 0;
-
-  scrollSwap = !scrollSwap;
-  setVRAMAddress(0, 0, true);
-  //vrambuf_clear();
-  vram_fill(0x00, 960);
   
-  scrollSwap = !scrollSwap;
   setVRAMAddress(0, 0, true);
-
+  
+  /*
+  for(i = 0; i < SHADOW_SIZE; i++)
+  {
+    shadow[i] = 0;
+  }
+  */
+  
+  outsideHelper = worldNumber;
+  
+  //ppu_off();
+  
   //maps are using RLE compression!
   for(rleInt = 0; rleInt < LargestWorld;)
   {
@@ -387,8 +443,8 @@ void loadWorld()
     int x = tileNum % NUM_SHADOW_COL;
 
 
-    char numberOfTimes;
-    char currentTile;
+    char numberOfTimes = 0;
+    char currentTile = 0;
     byte shadowBits = 0x00;
 
     //numberOfTimes = worldData[worldNumber][rleInt++];
@@ -415,7 +471,7 @@ void loadWorld()
     {
       setGround(x, y, shadowBits);
 
-      vram_put(currentTile);
+      //vram_put(currentTile);
     }
 
     tileNum += numberOfTimes;
@@ -425,6 +481,13 @@ void loadWorld()
       break;
     }
   }
+  
+  vram_unrle(worldData[worldNumber]);
+  
+  //vrambuf_flush();
+  
+  debugnameTable();
+  //ppu_on_all();
 
   if(worldNumber == 0)
   {
@@ -437,6 +500,7 @@ void loadWorld()
 
   //worldNumber = (worldNumber+1)%NumWorlds;
   numDoors = countUp(0xC4, true, DoorInfo);
+  tileNum = 0;
 }
 
 
@@ -557,35 +621,7 @@ int jumpTable[MAX_JUMP] =
 
 //functions defined here
 
-void updateScreen(unsigned char column, unsigned char row, char * buffer, unsigned char num_bytes)
-{
-  vrambuf_clear();
-  set_vram_update(updbuf);
-  if(scrollSwap)
-  {
-    vrambuf_put(NTADR_B(column, row), buffer, num_bytes);
-  }
-  else
-  {
-    vrambuf_put(NTADR_A(column, row), buffer, num_bytes);
-  }
 
-  vrambuf_flush();
-}
-
-void writeBinary(unsigned char x, unsigned char y, byte value)
-{
-  char dx[16];
-  //sprintf(dx, "%d", player.act.dx);
-  sprintf(dx, "%d %d %d %d %d %d %d %d", (value&0x80)>>7, (value&0x40)>>6, (value&0x20) >>5, (value&0x10)>>4, (value&0x08)>>3, (value&0x04)>>2, (value&0x02)>>1, value&0x01);
-  updateScreen(x, y, dx, 16);
-}
-
-int modulo(int x, int y)
-{
-  //if y is a power of 2...
-  return (x &(y-1));
-}
 
 void updateMetaSprite(unsigned char attribute, unsigned char * meta)
 {
@@ -730,6 +766,7 @@ void updatePlayerSprites()
   updateMetaSprite(player.act.attribute, PlayerMetaSprite_Jump);
 }
 
+
 byte old_worldScrolling = true;
 byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
 {
@@ -746,10 +783,9 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
     old_worldScrolling = true;
     
     scrollSwap = !scrollSwap;
-    
-    outsideHelper = scrollSwap;
-    
+
     loadWorld();
+    
     if(direction == 0x02)
     {
       //right
@@ -936,7 +972,7 @@ void main(void) {
   //debugDisplayShadow();
 
   ppu_on_all();
-
+  
   //always updates @ 60fps
   while (1)
   {
@@ -1506,33 +1542,7 @@ void main(void) {
     //transition = 0x02;
     worldScrolling = scrollWorld(transition, &player, worldScrolling);
 
-    /*
-    {
-      char dx[32];
-      word addr;
-
-      if(!scrollSwap)
-      {
-        addr = NTADR_A(0,0);
-        sprintf(dx, "NametableA: %d   ", addr);
-        updateScreen(2, 6, dx, 32);
-      }
-      if(scrollSwap)
-      {
-        addr = NTADR_B(0,0); 
-        sprintf(dx, "NametableB: %d   ", addr);
-        updateScreen(2, 7, dx, 32);
-      }
-
-
-      sprintf(dx, "world #: %d        ", worldNumber);
-      updateScreen(2, 5, dx, 32);
-
-      sprintf(dx, "scrollSwap: %d     ", scrollSwap);
-      updateScreen(2, 4, dx, 32);
-
-    }
-    */
+    
 
 
     {
