@@ -321,6 +321,48 @@ byte aboveOrBellowPlayer(unsigned char x, unsigned char y, byte groundOrBreak, b
   return inFront;
 }
 
+byte UpTo8DoorsOpen = 0;
+//8*2char's 
+char DoorInfo[8];
+char StairsGoToWorld[8];
+char DoorPositions[16];
+byte numDoors;
+//each bit represents one door, ordered left to right up down.
+
+byte countUp(char lookForMe, byte useDoorLocation, char * DoorInfo)
+{
+  byte count = 0;
+  byte current[NUM_SHADOW_COL];
+  byte doorCount = 0;
+  int x, y;
+  
+  ppu_wait_nmi();
+  setVRAMAddress(0, 0, true);
+   
+  for(y = 0; y < NUM_SHADOW_ROW; y++)
+  {
+    vram_read(current, NUM_SHADOW_COL);
+    setVRAMAddress(0, y, true);
+    for(x = 0; x < NUM_SHADOW_COL; x++)
+    {
+      if(current[x] == lookForMe)
+      {
+        if(useDoorLocation)
+        {
+          //doorCount = a num 0->8
+          byte temp = (doorCount << 4) | 0x04;
+          
+          DoorPositions[doorCount*2] = x;
+          DoorPositions[doorCount*2+1] = y;
+          
+          DoorInfo[doorCount++] = temp;
+        }
+        count++;
+      }
+    }
+  }
+  return count;
+}
 
 
 void loadWorld()
@@ -378,9 +420,18 @@ void loadWorld()
       break;
     }
   }
-
+  
+  if(worldNumber == 0)
+  {
+    //set all world stair destinations here!
+    for(i = 0; i < 8; i++)
+    {
+      StairsGoToWorld[i] = 1;
+    }
+  }
+  
   worldNumber = (worldNumber+1)%NumWorlds;
-
+  numDoors = countUp(0xC4, true, DoorInfo);
 }
 
 
@@ -677,6 +728,28 @@ void updatePlayerSprites()
   updateMetaSprite(player.act.attribute, PlayerMetaSprite_Jump);
 }
 
+/*
+byte getchar_vram(byte x, byte y) {
+  // compute VRAM read address
+  word addr;
+  byte rd;
+
+  addr = setVRAMAddress(x, y, false);
+  // result goes into rd
+
+  // wait for VBLANK to start
+  ppu_wait_nmi();
+  // set vram address and read byte into rd
+  vram_adr(addr);
+  vram_read(&rd, 1);
+  // scroll registers are corrupt
+  // fix by setting vram address
+  vram_adr(0x0);
+  return rd;
+}
+*/
+
+
 char groundBlock[6];
 
 // main function, run after console reset
@@ -701,6 +774,8 @@ void main(void) {
   //Destructable brick;
   SpriteActor feet;
 
+  byte doorsDirty = false;
+  
   Particles singleBricks[NUM_BRICKS];
   unsigned char numActive = 0;
 
@@ -711,7 +786,8 @@ void main(void) {
 
   char debugCheck = false;
   char worldScrolling = false;
-
+  
+  
   byte Up_Down = 0;
   byte lastTouch = 0;
 
@@ -1099,10 +1175,60 @@ void main(void) {
             setGround(itemX, itemY, 0);
 
             ppu_off();
-
-            setVRAMAddress(itemX, itemY, true);
-
-            vram_put(0x00);
+            
+            //check if it's a door (c4->c7)
+            //if it is replace with stair blocks
+            //else put background block in
+            {
+              char newBlock = 0x0D;
+              char oldBlock = getchar_vram(itemX, itemY);
+              
+              outsideHelper = oldBlock;
+              
+              if(oldBlock >= 0xC4 && oldBlock <= 0xC7)
+              {
+                int x = itemX, y = itemY, i;
+                //0xFc -> 0xFF
+                newBlock = 0xFc + (oldBlock -  0xC4);
+                
+                if(oldBlock == 0xC4)
+                {
+                  y++;
+                }
+                if( oldBlock == 0xc6)
+                {
+                  x--;
+                  y++;
+                }
+                if(oldBlock == 0xc7)
+                {
+                  x--;
+                }
+                
+                outsideHelper2 = x;
+                outsideHelper3 = y;
+                
+                for(i = 0; i < numDoors; i++)
+                {
+                  if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
+                  {
+                    DoorInfo[i]--;
+                    if(DoorInfo[i] == 0)
+                    {
+                      UpTo8DoorsOpen = UpTo8DoorsOpen | 1 << i;
+                      doorsDirty = true;
+                      //stairwellAccessable!
+                    }
+                    break;
+                  }
+                }
+                
+              }
+              setVRAMAddress(itemX, itemY, true);
+            
+              vram_put(newBlock);
+            }
+            
             ppu_on_all();
 
 
@@ -1114,6 +1240,34 @@ void main(void) {
               singleBricks[i].y = itemY*8;
 
             }
+          }
+        }
+      }
+    }
+
+    {
+      //makes stairs go to next level!
+      //char dx[32];
+
+      //writeBinary(UpTo8DoorsOpen, 2, 2);
+
+      //StairsGoToWorld[i]
+      for(i = 0; i < numDoors; i++)
+      {
+        
+        //sprintf(dx, "door: %d   ", DoorInfo[i]);
+        //updateScreen(2, 3+i, dx, 32);
+
+        if(((UpTo8DoorsOpen >> i) & 0x01) == 1)
+        {
+          //then these stairs are open!
+          if(jumping && player.act.x/8 >= DoorPositions[i*2]-1 && player.act.x/8 <= DoorPositions[i*2]+1
+            && player.act.y/8 >= DoorPositions[i*2 + 1]-1 && player.act.y/8 <= DoorPositions[i*2 + 1]+1)
+          {
+            jumping = false;
+            //instead go to new world
+            worldNumber = StairsGoToWorld[i];
+            worldScrolling = true;
           }
         }
       }
@@ -1277,12 +1431,12 @@ void main(void) {
       deltaY = player.act.dy * player.act.jumpSpeed;
 
 
-      if(useScrolling)
+      if(worldScrolling == false && useScrolling)
       {
         if(player.act.x + deltaX >= 256-16)
         {
           player.act.x = 256-16;
-
+          loadWorld();
           worldScrolling = true;
         }
 
