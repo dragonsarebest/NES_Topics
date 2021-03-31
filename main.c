@@ -151,7 +151,7 @@ const char worldData[NumWorlds][LargestWorld] = {
     }
 };
 char worldNumber;
-char transition = 0x80; //first bit = right, left, up, down
+char transition = 0x02;
 byte scrollSwap = false;
 
 word setVRAMAddress(int x, int y, byte setNow )
@@ -1536,8 +1536,7 @@ void main(void) {
 
     //byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
     //0x01 = left, 0x02 = right, 0x03 = up, 0x04 = down
-    worldScrolling = scrollWorld(0x02, &player, worldScrolling);
-
+    worldScrolling = scrollWorld(transition, &player, worldScrolling);
 
     {
       //animate the player!
