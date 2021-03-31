@@ -313,9 +313,9 @@ byte aboveOrBellowPlayer(unsigned char x, unsigned char y, byte groundOrBreak, b
       deltaX = 1;
     }
   }
-  
+
   deltaY += offset;
-  
+
   inFront = checkGround((x/8) + deltaX, (y/8) + deltaY, groundOrBreak);
   inFront = inFront | checkGround((x/8) + 1 + deltaX, (y/8) + deltaY, groundOrBreak) << 1;
   return inFront;
@@ -694,7 +694,7 @@ void main(void) {
   byte playerInAir = true; //since we start off the ground
   byte run = 0;
   byte swing = 0;
-  byte timeBetweenFall = 5;
+  byte timeBetweenFall = 2;
   byte fallTimer = 0;
 
   //Destructable destroybois[32];
@@ -711,6 +711,9 @@ void main(void) {
 
   char debugCheck = false;
   char worldScrolling = false;
+
+  byte Up_Down = 0;
+  byte lastTouch = 0;
 
   worldScrolling = true;
 
@@ -754,7 +757,9 @@ void main(void) {
   while (1)
   {
     int noBlocksAbove;
-    byte Up_Down = 0;
+    byte jumping;
+    byte breaking;
+
     int res = 0;
     char breakBlock;
     char pad_result= pad_poll(0) | pad_poll(1);
@@ -879,7 +884,6 @@ void main(void) {
       res = res | groundBlock[i];
     }
 
-    //res = groundBlock[0] | groundBlock[1];
 
     if(res != 0)
     {
@@ -899,7 +903,6 @@ void main(void) {
 
 
 
-    //char temp = (player.act.dx == -1);
     if((pad_result & 0x80)>>7 && lastFacingRight == false)
     {
       lastFacingRight = true;
@@ -916,20 +919,52 @@ void main(void) {
       updatePlayerSprites();
     }
 
-    
-    //writeBinary(2, 5, pad_result);
-    
-    noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, true, lastFacingRight, 0);
-    if(noBlocksAbove != 0 && ((pad_result & 0x10) >> 4))
+
     {
-      //pressing up but cant jump.... look up instead!
-      Up_Down = 0x01; //0x01 = up, 0x02 = down, 0x00 = neither
-    }
-    
-    if((pad_result & 0x20) >> 3)
-    {
-      //pressing down on keypad
-      Up_Down = 0x02;
+      byte shift = pad_result & 0x02;
+      jumping = pad_result & 0x10;
+      breaking = pad_result & 0x04;
+      noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, true, lastFacingRight, 0);
+
+      if(breaking != 0 || swing != 0 || shift != 0)
+      {
+        jumping = 0;
+        //cannot jump & break @ same time
+      }
+
+
+
+      //Up_Down = 0;
+      if(shift)
+      {
+        if((pad_result & 0x20))
+        {
+          noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, false, lastFacingRight, 0);
+          if(noBlocksAbove != 0)
+          {
+            //pressing down on keypad
+            Up_Down = 0x01;
+            lastTouch = 10;
+          }
+        }
+        else if(((pad_result & 0x10)))
+        {
+          //pressing up but cant jump.... look up instead!
+          Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
+          lastTouch = 10;
+        }
+        else if(lastTouch <= 0)
+        {
+          Up_Down = 0x00; 
+        }
+
+      }
+      if(lastTouch > 0)
+      {
+        lastTouch--;
+      }
+      //writeBinary(2, 5, pad_result);
+      //writeBinary(2, 2, Up_Down);
     }
 
 
@@ -966,13 +1001,28 @@ void main(void) {
       if(swing == 0)
       {
         byte offset = 1;
-        breakBlock = searchPlayer(player.act.x, player.act.y, 0, lastFacingRight, offset);
+        int upOffset = 0;
+        if(Up_Down == 0x01)
+        {
+          // up
+          upOffset = 1;
+        }
+        else if(Up_Down == 0x02)
+        {
+          // down
+          upOffset = -1;
+        }
+        else
+        {
+          upOffset = 0;
+        }
+        breakBlock = searchPlayer(player.act.x, player.act.y + (upOffset*8), 0, lastFacingRight, offset);
         //1101
-        if(pad_result&0x04)
+        if(breaking)
         {
           swing = 1;
         }
-        if((breakBlock != 0) && pad_result&0x04)
+        if((breakBlock != 0) && breaking)
         {
 
           int itemX, itemY, collision;
@@ -1042,6 +1092,10 @@ void main(void) {
 
           if(suitableOption)
           {
+            itemY += upOffset;
+
+            outsideHelper = upOffset;
+
             setGround(itemX, itemY, 0);
 
             ppu_off();
@@ -1068,7 +1122,7 @@ void main(void) {
 
     if(player.act.grounded && playerInAir)
     {
-      
+
       int itemY = 0;
 
       if((groundBlock[0] | groundBlock[1]) && ! (groundBlock[2] | groundBlock[3]))
@@ -1079,7 +1133,7 @@ void main(void) {
       {
         itemY = 1;
       }
-      
+
       player.act.y = ((player.act.y/8) + itemY)*8;
 
       player.act.dy = 0;
@@ -1093,7 +1147,7 @@ void main(void) {
     //jumping debug
     /*
     if(debugCheck){
-      
+
       byte above = true;
       int deltaY = 0;
       int deltaX = 0;
@@ -1124,34 +1178,34 @@ void main(void) {
       cur_oam = oam_spr(feet.act.x * 8, feet.act.y * 8, feet.sprite , 1, cur_oam);
       feet.act.x += 1;
       cur_oam = oam_spr(feet.act.x * 8, feet.act.y * 8, feet.sprite , 2, cur_oam);
-      
-      
+
+
       {
         byte result = 0;
         char dx[32];
         result = checkGround((player.act.x/8) + deltaX, (player.act.y/8) + deltaY, 1);
         sprintf(dx, "ground_01: %d   ", result);
         updateScreen(2, 7, dx, 32);
-        
+
         result = checkGround((player.act.x/8) + deltaX + 1, (player.act.y/8) + deltaY, 1);
         sprintf(dx, "ground_02: %d   ", result);
         updateScreen(2, 8, dx, 32);
-        
+
         result = aboveOrBellowPlayer(player.act.x, player.act.y, 1, above, lastFacingRight, 0);
-        
+
         sprintf(dx, "above: %d   ", result);
         updateScreen(2, 6, dx, 32);
-      
+
       }
     }
     */
 
     if(player.act.jumpTimer != MAX_JUMP-1 && !playerInAir)
     {
-      
-      
+
+
       //if(player.act.grounded == true && ((pad_result & 0x10) >> 4))
-      if(player.act.grounded == true && noBlocksAbove == 0 && ((pad_result & 0x10) >> 4))
+      if(player.act.grounded == true && noBlocksAbove == 0 && jumping)
       {
         //if grounded and you try to jump...
         player.act.jumpTimer = 0;
