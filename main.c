@@ -28,7 +28,7 @@ unsigned char name[]={\
         8,      8,      (code)+3,   attribute, \
         128};
 
-#define NES_MIRRORING 1("vertical", 0 = "horizontal")
+#define NES_MIRRORING 1 //(1 = "vertical", 0 = "horizontal")
 //Nametable A starts at 0x2000, Nametable B starts at 0x2400
 
 #define WORLD_WIDTH 240*2
@@ -152,12 +152,12 @@ const char worldData[NumWorlds][LargestWorld] = {
 };
 char worldNumber;
 char transition = 0x02;
-byte scrollSwap = false;
+byte scrollSwap = true;
 
 word setVRAMAddress(int x, int y, byte setNow )
 {
   word addr;
-  if(scrollSwap)
+  if(scrollSwap == true)
   {
     addr = NTADR_B(x,y);
   }
@@ -373,6 +373,11 @@ void loadWorld()
 
   scrollSwap = !scrollSwap;
   setVRAMAddress(0, 0, true);
+  //vrambuf_clear();
+  vram_fill(0x00, 960);
+  
+  scrollSwap = !scrollSwap;
+  setVRAMAddress(0, 0, true);
 
   //maps are using RLE compression!
   for(rleInt = 0; rleInt < LargestWorld;)
@@ -426,7 +431,7 @@ void loadWorld()
     //set all world stair destinations here!
     for(i = 0; i < 8; i++)
     {
-      StairsGoToWorld[i] = 0;
+      StairsGoToWorld[i] = 1;
     }
   }
 
@@ -676,9 +681,6 @@ short rectanglesHit(unsigned char x, unsigned char y, unsigned char width, unsig
   return true; 
 }
 
-
-
-
 void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
 {
   int i = 0;
@@ -728,27 +730,6 @@ void updatePlayerSprites()
   updateMetaSprite(player.act.attribute, PlayerMetaSprite_Jump);
 }
 
-/*
-byte getchar_vram(byte x, byte y) {
-  // compute VRAM read address
-  word addr;
-  byte rd;
-
-  addr = setVRAMAddress(x, y, false);
-  // result goes into rd
-
-  // wait for VBLANK to start
-  ppu_wait_nmi();
-  // set vram address and read byte into rd
-  vram_adr(addr);
-  vram_read(&rd, 1);
-  // scroll registers are corrupt
-  // fix by setting vram address
-  vram_adr(0x0);
-  return rd;
-}
-*/
-
 byte old_worldScrolling = true;
 byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
 {
@@ -757,14 +738,22 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
 
   playerDeltaX = PlayerActor->act.dx * PlayerActor->act.moveSpeed;
   playerDeltaY = PlayerActor->act.dy * PlayerActor->act.jumpSpeed;
-  
+
+  outsideHelper = direction;
+
   if(old_worldScrolling == false && worldScrolling == true)
   {
+    old_worldScrolling = true;
+    
+    scrollSwap = !scrollSwap;
+    
+    outsideHelper = scrollSwap;
+    
     loadWorld();
     if(direction == 0x02)
     {
       //right
-      PlayerActor->act.x = 8;
+      PlayerActor->act.x = 256-24;
     }
     else if(direction == 0x03)
     {
@@ -782,7 +771,7 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
       PlayerActor->act.x = 8;
     }
   }
-  
+
   if(worldScrolling == false)
   {
     PlayerActor->act.x += playerDeltaX;
@@ -824,11 +813,12 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
     if(direction == 0x01)
     {
       //left
-      if(world_x <= -256)
+      if(world_x <= 0)
       {
+        old_worldScrolling = false;
         player.act.x = 256-24;
         worldScrolling = false;
-        world_x = 0;
+        //world_x = 0;
       }
     }
     else if(direction == 0x02)
@@ -836,29 +826,38 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
       //right
       if(world_x >= 256)
       {
+        old_worldScrolling = false;
         player.act.x = 8;
         worldScrolling = false;
-        world_x = 0;
+        //world_x = 256;
       }
 
     }
     else if(direction == 0x03)
     {
       //up
+      if(world_y <= -256)
+      {
+        old_worldScrolling = false;
+        player.act.x = 8;
+        worldScrolling = false;
+        //world_y = 0;
+      }
     }
     else if(direction == 0x04)
     {
       //down
       if(world_y >= 256)
       {
-        player.act.y = 8;
+        old_worldScrolling = false;
+        player.act.x = 8;
         worldScrolling = false;
-        world_y = 0;
+        //world_y = 0;
       }
     }
   }
-  
-  old_worldScrolling = worldScrolling;
+
+  //old_worldScrolling = worldScrolling;
   return worldScrolling;
 }
 
@@ -883,8 +882,6 @@ void main(void) {
   byte timeBetweenFall = 2;
   byte fallTimer = 0;
 
-  //Destructable destroybois[32];
-  //Destructable brick;
   SpriteActor feet;
 
   byte doorsDirty = false;
@@ -935,12 +932,10 @@ void main(void) {
 
   worldNumber = 0;
   loadWorld();
-
+  updatePlayerSprites();
   //debugDisplayShadow();
 
   ppu_on_all();
-  //while(1)
-  //{};
 
   //always updates @ 60fps
   while (1)
@@ -961,59 +956,43 @@ void main(void) {
     player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6) ;
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, 0);
 
-    /*
-    if(debugCheck)
-    {
-      char dx[32];
-      //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "canWalk: %d", res);
-      updateScreen(2, 1, dx, 32);
-    }
-    */
-
     if(worldScrolling)
     {
       player.act.dx = 0;
+      player.act.dy = 0;
     }
-    else if(((res & 0x0C) >> 2) != 0 && lastFacingRight || ((res & 0x03)) != 0 && !lastFacingRight )
+    else
     {
-      int collision;
-
-
+      if(((res & 0x0C) >> 2) != 0 && lastFacingRight || ((res & 0x03)) != 0 && !lastFacingRight )
       {
-        //1,2,4,8 bits 
-        //1 & 2 = front 2
-        //4 & 8 = back 2
-        if(((res & 0x0C) >> 2) > 0)
+        int collision;
+
+
         {
-          //meaning we're moving right and the player's front 2 blocks are IN ground block...
-          if(lastFacingRight)
+          //1,2,4,8 bits 
+          //1 & 2 = front 2
+          //4 & 8 = back 2
+          if(((res & 0x0C) >> 2) > 0)
           {
-            collision = -2;
+            //meaning we're moving right and the player's front 2 blocks are IN ground block...
+            if(lastFacingRight)
+            {
+              collision = -2;
+            }
+            else
+            {
+              collision = 1;
+            }
+            player.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision)*8;
           }
-          else
-          {
-            collision = 1;
-          }
-          player.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision)*8;
         }
+
+        player.act.dx = 0;
       }
 
-      player.act.dx = 0;
-    }
+      res = 0;
 
-    /*
-    if(debugCheck)
-    {
-      char dx[32];
-      sprintf(dx, "x: %d", player.act.x);
-      updateScreen(2, 2, dx, 32);
-    }
-    */
-
-    res = 0;
-
-    /*
+      /*
     if((pad_result&0x08)>>3 && numActive == 0)
     {
       char closestBrick = 0;
@@ -1045,374 +1024,362 @@ void main(void) {
     }
     */
 
-    for(i = 0; i < 6; i++)
-    {
-
-      if(i >= 4 && player.act.dy == 0)
+      for(i = 0; i < 6; i++)
       {
-        groundBlock[i] = 0;
+
+        if(i >= 4 && player.act.dy == 0)
+        {
+          groundBlock[i] = 0;
+        }
+        else
+        {
+          if(!(player.act.dy > 0 && playerInAir) && (i == 2 || i == 3))
+          {
+            groundBlock[i] = 0;
+          }
+          else if(! (player.act.dy * player.act.jumpSpeed >= 8) && (i == 4 || i == 5))
+          {
+            groundBlock[i] = 0;
+          }
+          else
+          {
+            groundBlock[i] = checkGround((player.act.x/8) + (i%2), ((player.act.y)/8)+2 + (i/2), 1);
+          }
+
+        }
+        //writeBinary(2, 8+i, groundBlock[i]);
+
+        res = res | groundBlock[i];
+      }
+
+
+      if(res != 0)
+      {
+        player.act.grounded = true;
       }
       else
       {
-        if(!(player.act.dy > 0 && playerInAir) && (i == 2 || i == 3))
+        player.act.grounded = false;
+        if(player.act.grounded == false && playerInAir == false)
         {
-          groundBlock[i] = 0;
+          //start falling! we walk off a block and dont jump
+          player.act.jumpTimer = MAX_JUMP/2;
+          playerInAir = true;
+          fallTimer = 0;
         }
-        else if(! (player.act.dy * player.act.jumpSpeed >= 8) && (i == 4 || i == 5))
+      }
+
+
+
+      if((pad_result & 0x80)>>7 && lastFacingRight == false)
+      {
+        lastFacingRight = true;
+      }
+      else
+      {
+        if((pad_result & 0x40)>>6 && lastFacingRight)
         {
-          groundBlock[i] = 0;
+          lastFacingRight = false;
         }
-        else
+      }
+      {
+        player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
+        updatePlayerSprites();
+      }
+
+
+      {
+        byte shift = pad_result & 0x02;
+        jumping = pad_result & 0x10;
+        breaking = pad_result & 0x04;
+        noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, true, lastFacingRight, 0);
+
+        if(breaking != 0 || swing != 0 || shift != 0)
         {
-          groundBlock[i] = checkGround((player.act.x/8) + (i%2), ((player.act.y)/8)+2 + (i/2), 1);
+          jumping = 0;
+          //cannot jump & break @ same time
         }
 
-      }
-      //writeBinary(2, 8+i, groundBlock[i]);
-
-      res = res | groundBlock[i];
-    }
 
 
-    if(res != 0)
-    {
-      player.act.grounded = true;
-    }
-    else
-    {
-      player.act.grounded = false;
-      if(player.act.grounded == false && playerInAir == false)
-      {
-        //start falling! we walk off a block and dont jump
-        player.act.jumpTimer = MAX_JUMP/2;
-        playerInAir = true;
-        fallTimer = 0;
-      }
-    }
-
-
-
-    if((pad_result & 0x80)>>7 && lastFacingRight == false)
-    {
-      lastFacingRight = true;
-    }
-    else
-    {
-      if((pad_result & 0x40)>>6 && lastFacingRight)
-      {
-        lastFacingRight = false;
-      }
-    }
-    {
-      player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
-      updatePlayerSprites();
-    }
-
-
-    {
-      byte shift = pad_result & 0x02;
-      jumping = pad_result & 0x10;
-      breaking = pad_result & 0x04;
-      noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, true, lastFacingRight, 0);
-
-      if(breaking != 0 || swing != 0 || shift != 0)
-      {
-        jumping = 0;
-        //cannot jump & break @ same time
-      }
-
-
-
-      //Up_Down = 0;
-      if(shift)
-      {
-        if((pad_result & 0x20))
+        //Up_Down = 0;
+        if(shift)
         {
-          noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, false, lastFacingRight, 0);
-          if(noBlocksAbove != 0)
+          if((pad_result & 0x20))
           {
-            //pressing down on keypad
-            Up_Down = 0x01;
+            noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, false, lastFacingRight, 0);
+            if(noBlocksAbove != 0)
+            {
+              //pressing down on keypad
+              Up_Down = 0x01;
+              lastTouch = 10;
+            }
+          }
+          else if(((pad_result & 0x10)))
+          {
+            //pressing up but cant jump.... look up instead!
+            Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
             lastTouch = 10;
           }
-        }
-        else if(((pad_result & 0x10)))
-        {
-          //pressing up but cant jump.... look up instead!
-          Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
-          lastTouch = 10;
-        }
-        else if(lastTouch <= 0)
-        {
-          Up_Down = 0x00; 
-        }
-
-      }
-      if(lastTouch > 0)
-      {
-        lastTouch--;
-      }
-      //writeBinary(2, 5, pad_result);
-      //writeBinary(2, 2, Up_Down);
-    }
-
-
-    if(numActive)
-      for(i = 0; i < NUM_BRICKS; i++)
-      {
-        if(singleBricks[i].lifetime > 0)
-        {
-          cur_oam = oam_spr(singleBricks[i].x, singleBricks[i].y, singleBricks[i].sprite ,singleBricks[i].attribute, cur_oam);
-          //if(walk_wait == 0)
+          else if(lastTouch <= 0)
           {
-            singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx;
-            singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy;
+            Up_Down = 0x00; 
+          }
+
+        }
+        if(lastTouch > 0)
+        {
+          lastTouch--;
+        }
+        //writeBinary(2, 5, pad_result);
+        //writeBinary(2, 2, Up_Down);
+      }
 
 
-            if(singleBricks[i].lifetime != 1)
+      if(numActive)
+        for(i = 0; i < NUM_BRICKS; i++)
+        {
+          if(singleBricks[i].lifetime > 0)
+          {
+            cur_oam = oam_spr(singleBricks[i].x, singleBricks[i].y, singleBricks[i].sprite ,singleBricks[i].attribute, cur_oam);
+            //if(walk_wait == 0)
             {
-              singleBricks[i].lifetime--;
-            }
-            else
-            {
-              singleBricks[i].lifetime = 0;
-              numActive--;
-            }
+              singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx;
+              singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy;
 
+
+              if(singleBricks[i].lifetime != 1)
+              {
+                singleBricks[i].lifetime--;
+              }
+              else
+              {
+                singleBricks[i].lifetime = 0;
+                numActive--;
+              }
+
+            }
           }
         }
-      }
 
 
 
-    if(!worldScrolling)
-    {
-      if(swing == 0)
+      if(!worldScrolling)
       {
-        byte offset = 1;
-        int upOffset = 0;
-        if(Up_Down == 0x01)
+        if(swing == 0)
         {
-          // up
-          upOffset = 1;
-        }
-        else if(Up_Down == 0x02)
-        {
-          // down
-          upOffset = -1;
-        }
-        else
-        {
-          upOffset = 0;
-        }
-        breakBlock = searchPlayer(player.act.x, player.act.y + (upOffset*8), 0, lastFacingRight, offset);
-        //1101
-        if(breaking)
-        {
-          swing = 1;
-        }
-        if((breakBlock != 0) && breaking)
-        {
-
-          int itemX, itemY, collision;
-          byte suitableOption = true;
-          //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
-
-
-          outsideHelper = breakBlock;
-
-          if(lastFacingRight)
+          byte offset = 1;
+          int upOffset = 0;
+          if(Up_Down == 0x01)
           {
-            collision = -2;
+            // up
+            upOffset = 1;
+          }
+          else if(Up_Down == 0x02)
+          {
+            // down
+            upOffset = -1;
           }
           else
           {
-            collision = 1;
+            upOffset = 0;
           }
+          breakBlock = searchPlayer(player.act.x, player.act.y + (upOffset*8), 0, lastFacingRight, offset);
+          //1101
+          if(breaking)
+          {
+            swing = 1;
+          }
+          if((breakBlock != 0) && breaking)
+          {
 
-          if((breakBlock & 0x02) != 0)
-          {
-            itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-            itemY = player.act.y/8 + 1;
-          }
-          else if((breakBlock & 0x01) != 0)
-          {
-            itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-            itemY = player.act.y/8;
-          }
-          else
-          {
+            int itemX, itemY, collision;
+            byte suitableOption = true;
+            //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
+            outsideHelper = breakBlock;
+
             if(lastFacingRight)
             {
-              collision = -1;
+              collision = -2;
             }
             else
             {
-              collision = 2;
+              collision = 1;
             }
 
-            if((breakBlock & 0x08) != 0)
+            if((breakBlock & 0x02) != 0)
             {
               itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
               itemY = player.act.y/8 + 1;
             }
-            else if((breakBlock & 0x04) != 0)
+            else if((breakBlock & 0x01) != 0)
             {
               itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
               itemY = player.act.y/8;
             }
             else
             {
-              suitableOption = false; 
-            }
-          }
-
-          /*
-          if(debugCheck)
-          {
-            char dx[32];
-            //sprintf(dx, "%d", player.act.dx);
-            sprintf(dx, "player: %d %d    ", player.act.x/8, player.act.y/8);
-            updateScreen(2, 10, dx, 32);
-            sprintf(dx, "brick: %d %d      ", itemX, itemY);
-            updateScreen(2, 11, dx, 32);
-          }
-          */
-
-          if(suitableOption)
-          {
-            itemY += upOffset;
-
-            outsideHelper = upOffset;
-
-            setGround(itemX, itemY, 0);
-
-            ppu_off();
-
-            //check if it's a door (c4->c7)
-            //if it is replace with stair blocks
-            //else put background block in
-            {
-              char newBlock = 0x0D;
-              char oldBlock = getchar_vram(itemX, itemY);
-
-              outsideHelper = oldBlock;
-
-              if(oldBlock >= 0xC4 && oldBlock <= 0xC7)
+              if(lastFacingRight)
               {
-                int x = itemX, y = itemY, i;
-                //0xFc -> 0xFF
-                newBlock = 0xFc + (oldBlock -  0xC4);
+                collision = -1;
+              }
+              else
+              {
+                collision = 2;
+              }
 
-                if(oldBlock == 0xC4)
-                {
-                  y++;
-                }
-                if( oldBlock == 0xc6)
-                {
-                  x--;
-                  y++;
-                }
-                if(oldBlock == 0xc7)
-                {
-                  x--;
-                }
+              if((breakBlock & 0x08) != 0)
+              {
+                itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+                itemY = player.act.y/8 + 1;
+              }
+              else if((breakBlock & 0x04) != 0)
+              {
+                itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
+                itemY = player.act.y/8;
+              }
+              else
+              {
+                suitableOption = false; 
+              }
+            }
 
-                outsideHelper2 = x;
-                outsideHelper3 = y;
+            if(suitableOption)
+            {
+              itemY += upOffset;
 
-                for(i = 0; i < numDoors; i++)
+              outsideHelper = upOffset;
+
+              setGround(itemX, itemY, 0);
+
+              ppu_off();
+
+              //check if it's a door (c4->c7)
+              //if it is replace with stair blocks
+              //else put background block in
+              {
+                char newBlock = 0x0D;
+                char oldBlock = getchar_vram(itemX, itemY);
+
+                outsideHelper = oldBlock;
+
+                if(oldBlock >= 0xC4 && oldBlock <= 0xC7)
                 {
-                  if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
+                  int x = itemX, y = itemY, i;
+                  //0xFc -> 0xFF
+                  newBlock = 0xFc + (oldBlock -  0xC4);
+
+                  if(oldBlock == 0xC4)
                   {
-                    DoorInfo[i]--;
-                    if(DoorInfo[i] == 0)
-                    {
-                      UpTo8DoorsOpen = UpTo8DoorsOpen | 1 << i;
-                      doorsDirty = true;
-                      //stairwellAccessable!
-                    }
-                    break;
+                    y++;
                   }
+                  if( oldBlock == 0xc6)
+                  {
+                    x--;
+                    y++;
+                  }
+                  if(oldBlock == 0xc7)
+                  {
+                    x--;
+                  }
+
+                  outsideHelper2 = x;
+                  outsideHelper3 = y;
+
+                  for(i = 0; i < numDoors; i++)
+                  {
+                    if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
+                    {
+                      DoorInfo[i]--;
+                      if(DoorInfo[i] == 0)
+                      {
+                        UpTo8DoorsOpen = UpTo8DoorsOpen | 1 << i;
+                        doorsDirty = true;
+                        //stairwellAccessable!
+                        transition = 0x01;
+                      }
+                      break;
+                    }
+                  }
+
                 }
+                setVRAMAddress(itemX, itemY, true);
+
+                vram_put(newBlock);
+              }
+
+              ppu_on_all();
+
+
+              numActive = NUM_BRICKS;
+              for(i = 0; i < numActive; i++)
+              {
+                singleBricks[i].lifetime = brickLifetime;
+                singleBricks[i].x = itemX*8-5;
+                singleBricks[i].y = itemY*8;
 
               }
-              setVRAMAddress(itemX, itemY, true);
-
-              vram_put(newBlock);
-            }
-
-            ppu_on_all();
-
-
-            numActive = NUM_BRICKS;
-            for(i = 0; i < numActive; i++)
-            {
-              singleBricks[i].lifetime = brickLifetime;
-              singleBricks[i].x = itemX*8-5;
-              singleBricks[i].y = itemY*8;
-
             }
           }
         }
       }
-    }
 
-    {
-      //makes stairs go to next level!
-      //char dx[32];
-
-      //writeBinary(UpTo8DoorsOpen, 2, 2);
-
-      //StairsGoToWorld[i]
-      for(i = 0; i < numDoors; i++)
       {
+        //makes stairs go to next level!
+        //char dx[32];
 
-        //sprintf(dx, "door: %d   ", DoorInfo[i]);
-        //updateScreen(2, 3+i, dx, 32);
+        //writeBinary(UpTo8DoorsOpen, 2, 2);
 
-        if(((UpTo8DoorsOpen >> i) & 0x01) == 1)
+        //StairsGoToWorld[i]
+        for(i = 0; i < numDoors; i++)
         {
-          //then these stairs are open!
-          if(jumping && player.act.x/8 >= DoorPositions[i*2]-1 && player.act.x/8 <= DoorPositions[i*2]+1
-             && player.act.y/8 >= DoorPositions[i*2 + 1]-1 && player.act.y/8 <= DoorPositions[i*2 + 1]+1)
+
+          //sprintf(dx, "door: %d   ", DoorInfo[i]);
+          //updateScreen(2, 3+i, dx, 32);
+
+          if(((UpTo8DoorsOpen >> i) & 0x01) == 1)
           {
-            jumping = false;
-            //instead go to new world
-            worldNumber = StairsGoToWorld[i];
-            worldScrolling = true;
+            //then these stairs are open!
+            if(jumping && player.act.x/8 >= DoorPositions[i*2]-1 && player.act.x/8 <= DoorPositions[i*2]+1
+               && player.act.y/8 >= DoorPositions[i*2 + 1]-1 && player.act.y/8 <= DoorPositions[i*2 + 1]+1)
+            {
+              jumping = false;
+              //instead go to new world
+              worldNumber = StairsGoToWorld[i];
+              worldScrolling = true;
+              transition = 0x01;
+            }
           }
         }
       }
-    }
 
 
-    if(player.act.grounded && playerInAir)
-    {
-
-      int itemY = 0;
-
-      if((groundBlock[0] | groundBlock[1]) && ! (groundBlock[2] | groundBlock[3]))
+      if(player.act.grounded && playerInAir)
       {
-        itemY = 0;
+
+        int itemY = 0;
+
+        if((groundBlock[0] | groundBlock[1]) && ! (groundBlock[2] | groundBlock[3]))
+        {
+          itemY = 0;
+        }
+        else
+        {
+          itemY = 1;
+        }
+
+        player.act.y = ((player.act.y/8) + itemY)*8;
+
+        player.act.dy = 0;
+
+        playerInAir = false;
+        //player.act.grounded = false;
+        player.act.jumpTimer = 0;
+
       }
-      else
-      {
-        itemY = 1;
-      }
 
-      player.act.y = ((player.act.y/8) + itemY)*8;
-
-      player.act.dy = 0;
-
-      playerInAir = false;
-      //player.act.grounded = false;
-      player.act.jumpTimer = 0;
-
-    }
-
-    //jumping debug
-    /*
+      //jumping debug
+      /*
     if(debugCheck){
 
       byte above = true;
@@ -1467,76 +1434,106 @@ void main(void) {
     }
     */
 
-    if(player.act.jumpTimer != MAX_JUMP-1 && !playerInAir)
-    {
-
-
-      //if(player.act.grounded == true && ((pad_result & 0x10) >> 4))
-      if(player.act.grounded == true && noBlocksAbove == 0 && jumping)
-      {
-        //if grounded and you try to jump...
-        player.act.jumpTimer = 0;
-        player.act.dy = jumpTable[player.act.jumpTimer];
-        player.act.jumpTimer++;
-        playerInAir = true;
-        fallTimer = 0;
-      }
-
-    }
-
-
-    if(playerInAir && !player.act.grounded)
-    {
-
-      if(fallTimer == 0)
+      if(player.act.jumpTimer != MAX_JUMP-1 && !playerInAir)
       {
 
-        //going up or down in the air
-        player.act.dy = jumpTable[player.act.jumpTimer];
-        if(player.act.jumpTimer != MAX_JUMP-1)
+
+        //if(player.act.grounded == true && ((pad_result & 0x10) >> 4))
+        if(player.act.grounded == true && noBlocksAbove == 0 && jumping)
+        {
+          //if grounded and you try to jump...
+          player.act.jumpTimer = 0;
+          player.act.dy = jumpTable[player.act.jumpTimer];
           player.act.jumpTimer++;
+          playerInAir = true;
+          fallTimer = 0;
+        }
+
       }
 
-      fallTimer++;
-      fallTimer = fallTimer%timeBetweenFall;
 
+      if(playerInAir && !player.act.grounded)
+      {
+
+        if(fallTimer == 0)
+        {
+
+          //going up or down in the air
+          player.act.dy = jumpTable[player.act.jumpTimer];
+          if(player.act.jumpTimer != MAX_JUMP-1)
+            player.act.jumpTimer++;
+        }
+
+        fallTimer++;
+        fallTimer = fallTimer%timeBetweenFall;
+
+      }
+
+
+      //debug
+
+      /*
+      if(debugCheck)
+      {
+        char dx[32];
+        sprintf(dx, "grounded: %d   ", player.act.grounded);
+        updateScreen(2, 6, dx, 32);
+
+        writeBinary(2, 5, pad_result);
+
+
+        //sprintf(dx, "%d", player.act.dx);
+        sprintf(dx, "break block: %d", breakBlock);
+        updateScreen(2, 7, dx, 32);
+
+
+
+        //sprintf(dx, "%d", player.act.dx);
+        sprintf(dx, "air: %d        ", playerInAir);
+        updateScreen(2, 8, dx, 32);
+
+
+
+        //sprintf(dx, "%d", player.act.dx);
+        sprintf(dx, "timer: %d      ", player.act.jumpTimer);
+        updateScreen(2, 9, dx, 32);
+
+      }
+      */
     }
-
-
-    //debug
+    //byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
+    //0x01 = left, 0x02 = right, 0x03 = up, 0x04 = down
+    //transition = 0x02;
+    worldScrolling = scrollWorld(transition, &player, worldScrolling);
 
     /*
-    if(debugCheck)
     {
       char dx[32];
-      sprintf(dx, "grounded: %d   ", player.act.grounded);
-      updateScreen(2, 6, dx, 32);
+      word addr;
 
-      writeBinary(2, 5, pad_result);
-
-
-      //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "break block: %d", breakBlock);
-      updateScreen(2, 7, dx, 32);
-
-
-
-      //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "air: %d        ", playerInAir);
-      updateScreen(2, 8, dx, 32);
-
+      if(!scrollSwap)
+      {
+        addr = NTADR_A(0,0);
+        sprintf(dx, "NametableA: %d   ", addr);
+        updateScreen(2, 6, dx, 32);
+      }
+      if(scrollSwap)
+      {
+        addr = NTADR_B(0,0); 
+        sprintf(dx, "NametableB: %d   ", addr);
+        updateScreen(2, 7, dx, 32);
+      }
 
 
-      //sprintf(dx, "%d", player.act.dx);
-      sprintf(dx, "timer: %d      ", player.act.jumpTimer);
-      updateScreen(2, 9, dx, 32);
+      sprintf(dx, "world #: %d        ", worldNumber);
+      updateScreen(2, 5, dx, 32);
+
+      sprintf(dx, "scrollSwap: %d     ", scrollSwap);
+      updateScreen(2, 4, dx, 32);
 
     }
     */
 
-    //byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
-    //0x01 = left, 0x02 = right, 0x03 = up, 0x04 = down
-    worldScrolling = scrollWorld(transition, &player, worldScrolling);
 
     {
       //animate the player!
@@ -1639,7 +1636,6 @@ void main(void) {
 
     }
     */
-
 
 
     oam_hide_rest(cur_oam);
