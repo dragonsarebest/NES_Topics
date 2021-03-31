@@ -335,10 +335,10 @@ byte countUp(char lookForMe, byte useDoorLocation, char * DoorInfo)
   byte current[NUM_SHADOW_COL];
   byte doorCount = 0;
   int x, y;
-  
+
   ppu_wait_nmi();
   setVRAMAddress(0, 0, true);
-   
+
   for(y = 0; y < NUM_SHADOW_ROW; y++)
   {
     vram_read(current, NUM_SHADOW_COL);
@@ -351,10 +351,10 @@ byte countUp(char lookForMe, byte useDoorLocation, char * DoorInfo)
         {
           //doorCount = a num 0->8
           byte temp = (doorCount << 4) | 0x04;
-          
+
           DoorPositions[doorCount*2] = x;
           DoorPositions[doorCount*2+1] = y;
-          
+
           DoorInfo[doorCount++] = temp;
         }
         count++;
@@ -420,7 +420,7 @@ void loadWorld()
       break;
     }
   }
-  
+
   if(worldNumber == 0)
   {
     //set all world stair destinations here!
@@ -429,7 +429,7 @@ void loadWorld()
       StairsGoToWorld[i] = 0;
     }
   }
-  
+
   //worldNumber = (worldNumber+1)%NumWorlds;
   numDoors = countUp(0xC4, true, DoorInfo);
 }
@@ -749,6 +749,119 @@ byte getchar_vram(byte x, byte y) {
 }
 */
 
+byte old_worldScrolling = true;
+byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
+{
+  int deltaX = 0, deltaY = 0;
+  int playerDeltaX, playerDeltaY;
+
+  playerDeltaX = PlayerActor->act.dx * PlayerActor->act.moveSpeed;
+  playerDeltaY = PlayerActor->act.dy * PlayerActor->act.jumpSpeed;
+  
+  if(old_worldScrolling == false && worldScrolling == true)
+  {
+    loadWorld();
+    if(direction == 0x02)
+    {
+      //right
+      PlayerActor->act.x = 8;
+    }
+    else if(direction == 0x03)
+    {
+      //up
+      PlayerActor->act.y = 8;
+    }
+    else if(direction == 0x04)
+    {
+      //down
+      PlayerActor->act.y = 8;
+    }
+    else
+    {
+      //left & defualt direction
+      PlayerActor->act.x = 8;
+    }
+  }
+  
+  if(worldScrolling == false)
+  {
+    PlayerActor->act.x += playerDeltaX;
+    PlayerActor->act.y += playerDeltaY;
+  }
+  else
+  {
+    if(direction == 0x02)
+    {
+      //right
+      deltaX = 8;
+    }
+    else if(direction == 0x03)
+    {
+      //up
+      deltaY = -8;
+    }
+    else if(direction == 0x04)
+    {
+      //down
+      deltaY = 8;
+    }
+    else
+    {
+      //left & defualt direction
+      direction = 0x01;
+      deltaX = -8;
+    }
+
+    world_x += deltaX;
+    PlayerActor->act.x -= deltaX;
+
+    world_y += deltaY;
+    PlayerActor->act.y -= deltaY;
+
+    scroll(world_x, world_y);
+    //split(world_x, 0);
+
+    if(direction == 0x01)
+    {
+      //left
+      if(world_x <= -256)
+      {
+        player.act.x = 256-24;
+        worldScrolling = false;
+        world_x = 0;
+      }
+    }
+    else if(direction == 0x02)
+    {
+      //right
+      if(world_x >= 256)
+      {
+        player.act.x = 8;
+        worldScrolling = false;
+        world_x = 0;
+      }
+
+    }
+    else if(direction == 0x03)
+    {
+      //up
+    }
+    else if(direction == 0x04)
+    {
+      //down
+      if(world_y >= 256)
+      {
+        player.act.y = 8;
+        worldScrolling = false;
+        world_y = 0;
+      }
+    }
+  }
+  
+  old_worldScrolling = worldScrolling;
+  return worldScrolling;
+}
+
 
 char groundBlock[6];
 
@@ -775,7 +888,7 @@ void main(void) {
   SpriteActor feet;
 
   byte doorsDirty = false;
-  
+
   Particles singleBricks[NUM_BRICKS];
   unsigned char numActive = 0;
 
@@ -786,8 +899,8 @@ void main(void) {
 
   char debugCheck = false;
   char worldScrolling = false;
-  
-  
+
+
   byte Up_Down = 0;
   byte lastTouch = 0;
 
@@ -1175,22 +1288,22 @@ void main(void) {
             setGround(itemX, itemY, 0);
 
             ppu_off();
-            
+
             //check if it's a door (c4->c7)
             //if it is replace with stair blocks
             //else put background block in
             {
               char newBlock = 0x0D;
               char oldBlock = getchar_vram(itemX, itemY);
-              
+
               outsideHelper = oldBlock;
-              
+
               if(oldBlock >= 0xC4 && oldBlock <= 0xC7)
               {
                 int x = itemX, y = itemY, i;
                 //0xFc -> 0xFF
                 newBlock = 0xFc + (oldBlock -  0xC4);
-                
+
                 if(oldBlock == 0xC4)
                 {
                   y++;
@@ -1204,10 +1317,10 @@ void main(void) {
                 {
                   x--;
                 }
-                
+
                 outsideHelper2 = x;
                 outsideHelper3 = y;
-                
+
                 for(i = 0; i < numDoors; i++)
                 {
                   if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
@@ -1222,13 +1335,13 @@ void main(void) {
                     break;
                   }
                 }
-                
+
               }
               setVRAMAddress(itemX, itemY, true);
-            
+
               vram_put(newBlock);
             }
-            
+
             ppu_on_all();
 
 
@@ -1254,7 +1367,7 @@ void main(void) {
       //StairsGoToWorld[i]
       for(i = 0; i < numDoors; i++)
       {
-        
+
         //sprintf(dx, "door: %d   ", DoorInfo[i]);
         //updateScreen(2, 3+i, dx, 32);
 
@@ -1262,7 +1375,7 @@ void main(void) {
         {
           //then these stairs are open!
           if(jumping && player.act.x/8 >= DoorPositions[i*2]-1 && player.act.x/8 <= DoorPositions[i*2]+1
-            && player.act.y/8 >= DoorPositions[i*2 + 1]-1 && player.act.y/8 <= DoorPositions[i*2 + 1]+1)
+             && player.act.y/8 >= DoorPositions[i*2 + 1]-1 && player.act.y/8 <= DoorPositions[i*2 + 1]+1)
           {
             jumping = false;
             //instead go to new world
@@ -1421,63 +1534,9 @@ void main(void) {
     }
     */
 
-    //scrolling
-    {
-      byte useScrolling = true;
-
-      int deltaX = 0;
-      int deltaY = 0;
-      deltaX = player.act.dx * player.act.moveSpeed;
-      deltaY = player.act.dy * player.act.jumpSpeed;
-
-
-      if(worldScrolling == false && useScrolling)
-      {
-        if(player.act.x + deltaX >= 256-16)
-        {
-          player.act.x = 256-16;
-          loadWorld();
-          worldScrolling = true;
-        }
-
-        if(worldScrolling == false)
-        {
-          player.act.x += deltaX;
-          player.act.y += deltaY;
-        }
-
-      }
-      else
-      {
-        player.act.x += deltaX;
-        player.act.y += deltaY;
-      }
-
-      if(worldScrolling)
-      {
-        //scroll one descrete chunk ata  time...
-
-        //assuming the world is to the right
-        world_x += 8;
-        player.act.x -=8;
-
-        scroll(world_x, world_y);
-        //split(world_x, 0);
-
-        if(world_x >= 256)
-        {
-          if(debugCheck)
-          {
-            debugDisplayShadow();
-          }
-
-          player.act.x = 8;
-          worldScrolling = false;
-          world_x = 0;
-
-        }
-      }
-    }
+    //byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
+    //0x01 = left, 0x02 = right, 0x03 = up, 0x04 = down
+    worldScrolling = scrollWorld(0x02, &player, worldScrolling);
 
 
     {
