@@ -426,11 +426,11 @@ void loadWorld()
     //set all world stair destinations here!
     for(i = 0; i < 8; i++)
     {
-      StairsGoToWorld[i] = 1;
+      StairsGoToWorld[i] = 0;
     }
   }
   
-  worldNumber = (worldNumber+1)%NumWorlds;
+  //worldNumber = (worldNumber+1)%NumWorlds;
   numDoors = countUp(0xC4, true, DoorInfo);
 }
 
