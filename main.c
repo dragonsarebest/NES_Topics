@@ -289,14 +289,17 @@ byte countUp(char lookForMe, byte useDoorLocation, char * DoorInfo)
   byte current[NUM_SHADOW_COL];
   byte doorCount = 0;
   int x, y;
+  word addr;
 
-  ppu_wait_nmi();
-  setVRAMAddress(0, 0, true);
+  //ppu_wait_nmi();
+  addr = setVRAMAddress(0, 0, true);
 
   for(y = 0; y < NUM_SHADOW_ROW; y++)
   {
     vram_read(current, NUM_SHADOW_COL);
     setVRAMAddress(0, y, true);
+    //addr += NUM_SHADOW_COL;
+    
     for(x = 0; x < NUM_SHADOW_COL; x++)
     {
       if(current[x] == lookForMe)
@@ -374,7 +377,7 @@ void debugDisplayShadow()
 {
 
   int rleInt, x, y, ground, breakable;
-
+  
   ppu_off();
 
   setVRAMAddress(0, 0, true);
@@ -455,7 +458,7 @@ void loadWorld()
     tileNum++;
   }
 
-  debugnameTable();
+  ppu_on_all();
 
   if(worldNumber == 0)
   {
@@ -471,7 +474,9 @@ void loadWorld()
 
   //debugDisplayShadow();
   
-   ppu_on_all();
+  //ppu_on_all();
+  
+  debugnameTable();
 }
 
 
