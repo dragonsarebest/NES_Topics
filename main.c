@@ -1,8 +1,8 @@
 /*
-game idea:
-you're storming a castle and can break blocks and other objects -> they explode into chunks
-I will need to sprinkle in some larger chunks too.....
-*/
+  game idea:
+  you're storming a castle and can break blocks and other objects -> they explode into chunks
+  I will need to sprinkle in some larger chunks too.....
+  */
 
 #include "neslib.h"
 #include "neslib.h"
@@ -21,12 +21,12 @@ I will need to sprinkle in some larger chunks too.....
 
 // define a 2x2 metasprite
 #define DEF_METASPRITE_2x2(name, code, attribute)\
-unsigned char name[]={\
-        0,      0,      (code)+0,   attribute, \
-        0,      8,      (code)+1,   attribute, \
-        8,      0,      (code)+2,   attribute, \
-        8,      8,      (code)+3,   attribute, \
-        128};
+  unsigned char name[]={\
+          0,      0,      (code)+0,   attribute, \
+          0,      8,      (code)+1,   attribute, \
+          8,      0,      (code)+2,   attribute, \
+          8,      8,      (code)+3,   attribute, \
+          128};
 
 #define NES_MIRRORING 1 //(1 = "vertical", 0 = "horizontal")
 //Nametable A starts at 0x2000, Nametable B starts at 0x2400
@@ -82,20 +82,29 @@ const char worldData[NumWorlds][LargestWorld] = {
     },
 
   {
-    0x01,0x00,0x01,0x55,0x0a,0x01,0x04,0x00,0x01,0x16,0x0a,0x01,0x09,0x00,0x01,0x0f,
-    0x0a,0x01,0x06,0x02,0x0a,0x01,0x07,0x00,0x01,0x0e,0x0a,0x01,0x07,0x02,0x0a,0x01,
-    0x07,0x00,0x01,0x0e,0x0a,0x01,0x10,0x00,0x01,0x0e,0x0a,0x01,0x03,0x02,0x0a,0x01,
-    0x06,0x02,0x0a,0x01,0x04,0x00,0x01,0x0d,0x0a,0x01,0x03,0x02,0x0a,0x01,0x05,0x02,
-    0x02,0x0a,0x01,0x04,0x00,0x01,0x0d,0x0a,0x01,0x04,0x02,0x0a,0x02,0x0a,0x0a,0x02,
-    0x02,0x0a,0x01,0x05,0x00,0x01,0x0e,0x0a,0x01,0x03,0x02,0x01,0x02,0x0a,0x02,0x02,
-    0x0a,0x01,0x05,0x00,0x01,0x10,0x0a,0x01,0x03,0x02,0x01,0x03,0x0a,0x01,0x04,0x00,
-    0x01,0x16,0x02,0x01,0x03,0x00,0x01,0x1c,0x02,0x02,0x00,0x01,0x1d,0x02,0x02,0x00,
-    0x01,0x1d,0x02,0x02,0x00,0x01,0x1d,0x02,0x02,0x00,0x01,0x1d,0x02,0x02,0x00,0x01,
-    0x1d,0x02,0x02,0x00,0x01,0x1d,0x02,0x02,0x00,0x01,0x1a,0x0f,0x01,0x03,0x02,0x00,
-    0x01,0x19,0x0f,0x01,0x0a,0x00,0x01,0x12,0x0f,0x01,0x0e,0x00,0x01,0x0f,0x0f,0x01,
-    0x11,0x00,0x01,0x0a,0x0f,0x01,0x15,0x00,0x01,0x02,0xc4,0xc6,0x00,0x01,0x02,0x0f,
-    0x01,0x18,0x00,0x00,0xc5,0xc7,0x00,0x0f,0x01,0x1a,0x00,0x00,0xc0,0x01,0x1d,0x00,
-    0x01,0x3f,0x00,0x01,0x00
+    0x01,0x00,0x01,0x20,0xc1,0xc1,0x00,0x01,0x1d,0xc1,0xc1,0x00,0x01,0x12,0x0a,0x01,
+    0x04,0x00,0x01,0x05,0xc1,0xc1,0x00,0x01,0x0e,0x0a,0x01,0x09,0x00,0x01,0x04,0xc1,
+    0xc1,0x00,0x01,0x08,0x0a,0x01,0x06,0x02,0x0a,0x01,0x07,0x00,0x01,0x04,0xc1,0xc1,
+    0x00,0x01,0x07,0x0a,0x01,0x07,0x02,0x0a,0x01,0x07,0x00,0x01,0x04,0xc1,0xc1,0x00,
+    0x01,0x07,0x0a,0x01,0x10,0x00,0x01,0x04,0xc1,0xc1,0x00,0x01,0x07,0x0a,0x01,0x03,
+    0x02,0x0a,0x01,0x06,0x02,0x0a,0x01,0x04,0x00,0x01,0x03,0xc1,0xc1,0x00,0x01,0x07,
+    0x0a,0x01,0x03,0x02,0x0a,0x01,0x05,0x02,0x02,0x0a,0x01,0x04,0x00,0x01,0x03,0xc1,
+    0xc1,0x00,0x01,0x07,0x0a,0x01,0x04,0x02,0x0a,0x02,0x0a,0x0a,0x02,0x02,0x0a,0x01,
+    0x05,0x00,0x01,0x03,0xc1,0xc1,0x00,0x01,0x08,0x0a,0x01,0x03,0x02,0x01,0x02,0x0a,
+    0x02,0x02,0x0a,0x01,0x05,0x00,0x01,0x04,0xc1,0xc1,0x00,0x01,0x09,0x0a,0x01,0x03,
+    0x02,0x01,0x03,0x0a,0x01,0x04,0x00,0x01,0x06,0xc1,0xc1,0x00,0x01,0x0d,0x02,0x01,
+    0x03,0x00,0x01,0x0b,0xc1,0xc1,0x00,0x01,0x0e,0x02,0x02,0x00,0x01,0x0c,0xc1,0xc1,
+    0x00,0x01,0x0e,0x02,0x02,0x00,0x01,0x0c,0xc1,0xc1,0x00,0x01,0x0e,0x02,0x02,0x00,
+    0x01,0x0c,0xc1,0xc1,0x00,0x01,0x0e,0x02,0x02,0x00,0x01,0x0c,0xc1,0xc1,0x00,0x01,
+    0x0e,0x02,0x02,0x00,0x01,0x0c,0xc1,0xc1,0x00,0x01,0x0e,0x02,0x02,0x00,0x01,0x1d,
+    0x02,0x02,0x00,0x01,0x1a,0x0f,0x01,0x03,0x02,0x00,0x01,0x19,0x0f,0x01,0x0a,0x00,
+    0x01,0x12,0x0f,0x01,0x03,0xc1,0x0f,0xc1,0xc1,0x0f,0x01,0x06,0x00,0x01,0x05,0xc1,
+    0xc1,0x00,0x01,0x07,0x0f,0x01,0x03,0xc1,0x01,0x08,0x0f,0x01,0x04,0x00,0x01,0x03,
+    0xc1,0xc1,0x00,0x01,0x04,0x0f,0x01,0x05,0xc1,0xc1,0x0f,0x01,0x06,0xc1,0x0f,0x01,
+    0x05,0x00,0x01,0x02,0xc4,0xc6,0x00,0x01,0x02,0x0f,0x01,0x06,0xc1,0xc1,0x0f,0x01,
+    0x07,0xc1,0x01,0x02,0x0f,0x01,0x04,0x00,0x00,0xc5,0xc7,0x00,0x0f,0x01,0x08,0xc1,
+    0x0f,0x01,0x0a,0xc1,0x0f,0x01,0x04,0x00,0x00,0xc0,0x01,0x1d,0x00,0x01,0x3f,0x00,
+    0x01,0x00
     }
 };
 char worldNumber;
@@ -415,7 +424,7 @@ void loadWorld()
   byte current[NUM_SHADOW_COL];
   byte doorCount = 0;
   word addr;
-  
+
   scrollSwap = !scrollSwap;
   addr = setVRAMAddress(0, 0, true);
 
@@ -423,46 +432,48 @@ void loadWorld()
   vram_inc(0);
   vram_unrle(worldData[worldNumber]);
   //ppu_on_all();
-
+  vrambuf_flush();
+  
   addr = setVRAMAddress(0, 0, true);
   while(tileNum < LargestWorld)
   {
     int y = tileNum / NUM_SHADOW_COL; //tileNum / 32 = y value
     int x = tileNum % NUM_SHADOW_COL;
 
-    byte currentTile = 0x00;
-    byte shadowBits = 0x00;
-
     addr = setVRAMAddress(x, y, true);
 
     vram_read(current, NUM_SHADOW_COL);
     for(i = 0; i < NUM_SHADOW_COL; i++)
     {
-
+      byte shadowBits = 0x00;
       y = tileNum / NUM_SHADOW_COL; //tileNum / 32 = y value
       x = tileNum % NUM_SHADOW_COL;
 
-      if(current[i] == 0xC4)
+      if(current[x] == 0xC4)
       {
         //byte temp = (doorCount << 4) | 0x04;
         byte temp = 0x04;
+
+        outsideHelper = x;
+        outsideHelper2 = y;
+
         DoorPositions[doorCount*2] = x;
         DoorPositions[doorCount*2+1] = y;
         DoorInfo[doorCount++] = temp;
         numDoors++;
       }
 
-      if((current[i] & 0xF0) > 0x70)
+      if((current[x] & 0xF0) > 0x70)
       {
         shadowBits = 0x03; //breakable and ground
       }
 
-      if(current[i] == 0xc0)
+      if(current[x] == 0xc0)
       {
         shadowBits = 0x02; //just ground
       }
 
-      if(current[i] == 0xc4 || current[i] == 0xc5 || current[i] == 0xc6 || current[i] == 0xc7)
+      if(current[x] == 0xc4 || current[x] == 0xc5 || current[x] == 0xc6 || current[x] == 0xc7)
       {
         shadowBits = 0x01; // just breakable
       }
@@ -474,10 +485,10 @@ void loadWorld()
 
 
   }
+  
+ 
 
   ppu_on_all();
-
-  outsideHelper = numDoors;
 
   if(worldNumber == 0)
   {
@@ -487,15 +498,18 @@ void loadWorld()
       StairsGoToWorld[i] = 1;
     }
   }
-
-  //worldNumber = (worldNumber+1)%NumWorlds;
+  if(worldNumber == 1)
+  {
+    //set all world stair destinations here!
+    for(i = 0; i < 8; i++)
+    {
+      StairsGoToWorld[i] = 0;
+    }
+  }
+  
   //numDoors = countUp(0xC4, true, DoorInfo);
-
   //debugDisplayShadow();
 
-  //ppu_on_all();
-
-  debugnameTable();
 }
 
 
@@ -738,7 +752,7 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
   {
     old_worldScrolling = true;
 
-    
+
 
     loadWorld();
 
@@ -1006,36 +1020,36 @@ void main(void) {
       res = 0;
 
       /*
-    if((pad_result&0x08)>>3 && numActive == 0)
-    {
-      char closestBrick = 0;
-      int currentClosest = 1000;
-      for(i = 0; i < 32; i++)
+      if((pad_result&0x08)>>3 && numActive == 0)
       {
-        int dist = (destroybois[i].x-player.act.x)*(destroybois[i].x-player.act.x) + (destroybois[i].y-player.act.y)*(destroybois[i].y-player.act.y);
-        if(dist < currentClosest)
+        char closestBrick = 0;
+        int currentClosest = 1000;
+        for(i = 0; i < 32; i++)
         {
-          currentClosest = dist;
-          closestBrick = i;
+          int dist = (destroybois[i].x-player.act.x)*(destroybois[i].x-player.act.x) + (destroybois[i].y-player.act.y)*(destroybois[i].y-player.act.y);
+          if(dist < currentClosest)
+          {
+            currentClosest = dist;
+            closestBrick = i;
+          }
         }
-      }
-      //pressing enter respawns brick...
-      for(i = 0; i < 1; i++)
-      {
-        //SPAWN
-        //SPAWN
-        ppu_off();
-        //ppu_wait_nmi();
-        vram_adr(NTADR_A(destroybois[currentClosest].x>>3, destroybois[currentClosest].y>>3));
-        vram_put(destroybois[currentClosest].sprite);
-        ppu_on_all();
+        //pressing enter respawns brick...
+        for(i = 0; i < 1; i++)
+        {
+          //SPAWN
+          //SPAWN
+          ppu_off();
+          //ppu_wait_nmi();
+          vram_adr(NTADR_A(destroybois[currentClosest].x>>3, destroybois[currentClosest].y>>3));
+          vram_put(destroybois[currentClosest].sprite);
+          ppu_on_all();
 
-        destroybois[currentClosest].alive = true;
-        setGround(destroybois[currentClosest].x>>3, destroybois[currentClosest].y>>3, 0x03);
-      }
+          destroybois[currentClosest].alive = true;
+          setGround(destroybois[currentClosest].x>>3, destroybois[currentClosest].y>>3, 0x03);
+        }
 
-    }
-    */
+      }
+      */
 
       for(i = 0; i < 6; i++)
       {
@@ -1394,59 +1408,59 @@ void main(void) {
 
       //jumping debug
       /*
-    if(debugCheck){
+      if(debugCheck){
 
-      byte above = true;
-      int deltaY = 0;
-      int deltaX = 0;
-      if(above)
-      {
-        deltaY = -1;
-      }
-      else
-      {
-        deltaY = 2;
-      }
-      if(player.act.x % 8 != 0)
-      {
-        if(lastFacingRight)
+        byte above = true;
+        int deltaY = 0;
+        int deltaX = 0;
+        if(above)
         {
-          deltaX = 1;
+          deltaY = -1;
+        }
+        else
+        {
+          deltaY = 2;
+        }
+        if(player.act.x % 8 != 0)
+        {
+          if(lastFacingRight)
+          {
+            deltaX = 1;
+          }
+        }
+        else
+        {
+          if(!lastFacingRight)
+          {
+            deltaX = 1;
+          }
+        }
+        feet.act.x = (player.act.x/8 + deltaX);
+        feet.act.y = (player.act.y/8 + deltaY);
+        cur_oam = oam_spr(feet.act.x * 8, feet.act.y * 8, feet.sprite , 1, cur_oam);
+        feet.act.x += 1;
+        cur_oam = oam_spr(feet.act.x * 8, feet.act.y * 8, feet.sprite , 2, cur_oam);
+
+
+        {
+          byte result = 0;
+          char dx[32];
+          result = checkGround((player.act.x/8) + deltaX, (player.act.y/8) + deltaY, 1);
+          sprintf(dx, "ground_01: %d   ", result);
+          updateScreen(2, 7, dx, 32);
+
+          result = checkGround((player.act.x/8) + deltaX + 1, (player.act.y/8) + deltaY, 1);
+          sprintf(dx, "ground_02: %d   ", result);
+          updateScreen(2, 8, dx, 32);
+
+          result = aboveOrBellowPlayer(player.act.x, player.act.y, 1, above, lastFacingRight, 0);
+
+          sprintf(dx, "above: %d   ", result);
+          updateScreen(2, 6, dx, 32);
+
         }
       }
-      else
-      {
-        if(!lastFacingRight)
-        {
-          deltaX = 1;
-        }
-      }
-      feet.act.x = (player.act.x/8 + deltaX);
-      feet.act.y = (player.act.y/8 + deltaY);
-      cur_oam = oam_spr(feet.act.x * 8, feet.act.y * 8, feet.sprite , 1, cur_oam);
-      feet.act.x += 1;
-      cur_oam = oam_spr(feet.act.x * 8, feet.act.y * 8, feet.sprite , 2, cur_oam);
-
-
-      {
-        byte result = 0;
-        char dx[32];
-        result = checkGround((player.act.x/8) + deltaX, (player.act.y/8) + deltaY, 1);
-        sprintf(dx, "ground_01: %d   ", result);
-        updateScreen(2, 7, dx, 32);
-
-        result = checkGround((player.act.x/8) + deltaX + 1, (player.act.y/8) + deltaY, 1);
-        sprintf(dx, "ground_02: %d   ", result);
-        updateScreen(2, 8, dx, 32);
-
-        result = aboveOrBellowPlayer(player.act.x, player.act.y, 1, above, lastFacingRight, 0);
-
-        sprintf(dx, "above: %d   ", result);
-        updateScreen(2, 6, dx, 32);
-
-      }
-    }
-    */
+      */
 
       if(player.act.jumpTimer != MAX_JUMP-1 && !playerInAir)
       {
@@ -1487,42 +1501,39 @@ void main(void) {
       //debug
 
       /*
-      if(debugCheck)
-      {
-        char dx[32];
-        sprintf(dx, "grounded: %d   ", player.act.grounded);
-        updateScreen(2, 6, dx, 32);
+        if(debugCheck)
+        {
+          char dx[32];
+          sprintf(dx, "grounded: %d   ", player.act.grounded);
+          updateScreen(2, 6, dx, 32);
 
-        writeBinary(2, 5, pad_result);
-
-
-        //sprintf(dx, "%d", player.act.dx);
-        sprintf(dx, "break block: %d", breakBlock);
-        updateScreen(2, 7, dx, 32);
+          writeBinary(2, 5, pad_result);
 
 
-
-        //sprintf(dx, "%d", player.act.dx);
-        sprintf(dx, "air: %d        ", playerInAir);
-        updateScreen(2, 8, dx, 32);
+          //sprintf(dx, "%d", player.act.dx);
+          sprintf(dx, "break block: %d", breakBlock);
+          updateScreen(2, 7, dx, 32);
 
 
 
-        //sprintf(dx, "%d", player.act.dx);
-        sprintf(dx, "timer: %d      ", player.act.jumpTimer);
-        updateScreen(2, 9, dx, 32);
+          //sprintf(dx, "%d", player.act.dx);
+          sprintf(dx, "air: %d        ", playerInAir);
+          updateScreen(2, 8, dx, 32);
 
-      }
-      */
+
+
+          //sprintf(dx, "%d", player.act.dx);
+          sprintf(dx, "timer: %d      ", player.act.jumpTimer);
+          updateScreen(2, 9, dx, 32);
+
+        }
+        */
     }
     //byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
     //0x01 = left, 0x02 = right, 0x03 = up, 0x04 = down
     //transition = 0x02;
     worldScrolling = scrollWorld(transition, &player, worldScrolling);
-
-
-
-
+    
     {
       //animate the player!
       byte shoudlRun = true;
@@ -1585,45 +1596,45 @@ void main(void) {
 
     //minning debug
     /*
-    if(debugCheck)
-    {
-
-      int collision = 0;
-      if(lastFacingRight)
+      if(debugCheck)
       {
-        collision = -2;
+
+        int collision = 0;
+        if(lastFacingRight)
+        {
+          collision = -2;
+        }
+        else
+        {
+          collision = 1;
+        }
+        feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
+        feet.act.y = (player.act.y/8) *8;
+        cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
+
+        feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
+        feet.act.y = ((player.act.y/8) + 1) *8;
+        cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
+
+        if(lastFacingRight)
+        {
+          collision = -1;
+        }
+        else
+        {
+          collision = 2;
+        }
+
+        feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
+        feet.act.y = (player.act.y/8) *8;
+        cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
+
+        feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
+        feet.act.y = (player.act.y/8 + 1) *8;
+        cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
+
       }
-      else
-      {
-        collision = 1;
-      }
-      feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
-      feet.act.y = (player.act.y/8) *8;
-      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
-
-      feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
-      feet.act.y = ((player.act.y/8) + 1) *8;
-      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-
-      if(lastFacingRight)
-      {
-        collision = -1;
-      }
-      else
-      {
-        collision = 2;
-      }
-
-      feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
-      feet.act.y = (player.act.y/8) *8;
-      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-
-      feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
-      feet.act.y = (player.act.y/8 + 1) *8;
-      cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-
-    }
-    */
+      */
 
 
     oam_hide_rest(cur_oam);
