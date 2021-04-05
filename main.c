@@ -1099,38 +1099,6 @@ void main(void) {
 
       res = 0;
 
-      /*
-      if((pad_result&0x08)>>3 && numActive == 0)
-      {
-        char closestBrick = 0;
-        int currentClosest = 1000;
-        for(i = 0; i < 32; i++)
-        {
-          int dist = (destroybois[i].x-player.act.x)*(destroybois[i].x-player.act.x) + (destroybois[i].y-player.act.y)*(destroybois[i].y-player.act.y);
-          if(dist < currentClosest)
-          {
-            currentClosest = dist;
-            closestBrick = i;
-          }
-        }
-        //pressing enter respawns brick...
-        for(i = 0; i < 1; i++)
-        {
-          //SPAWN
-          //SPAWN
-          ppu_off();
-          //ppu_wait_nmi();
-          vram_adr(NTADR_A(destroybois[currentClosest].x>>3, destroybois[currentClosest].y>>3));
-          vram_put(destroybois[currentClosest].sprite);
-          ppu_on_all();
-
-          destroybois[currentClosest].alive = true;
-          setGround(destroybois[currentClosest].x>>3, destroybois[currentClosest].y>>3, 0x03);
-        }
-
-      }
-      */
-
       for(i = 0; i < 6; i++)
       {
 
