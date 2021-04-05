@@ -1510,7 +1510,6 @@ void main(void) {
               worldNumber = StairsGoToWorld[i];
               worldScrolling = true;
               //transition = 0x01;
-              transition = 0x00;
               ppu_off();
             }
           }
