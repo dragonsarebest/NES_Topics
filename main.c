@@ -4,6 +4,10 @@
   I will need to sprinkle in some larger chunks too.....
   */
 
+
+#define NES_MIRRORING 1 //(1 = "vertical", 0 = "horizontal")
+//Nametable A starts at 0x2000, Nametable B starts at 0x2400
+
 #include "neslib.h"
 #include "neslib.h"
 
@@ -30,8 +34,6 @@
           8,      8,      (code)+3,   attribute, \
           128};
 
-#define NES_MIRRORING 1 //(1 = "vertical", 0 = "horizontal")
-//Nametable A starts at 0x2000, Nametable B starts at 0x2400
 
 #define WORLD_WIDTH 240*2
 #define WORLD_HEIGHT 256
@@ -110,8 +112,8 @@ const char worldData[NumWorlds][LargestWorld] = {
     }
 };
 char worldNumber;
-char transition = 0x02;
-byte scrollSwap = false;
+char transition;
+byte scrollSwap;
 
 word setVRAMAddress(int x, int y, byte setNow )
 {
@@ -141,12 +143,17 @@ byte getchar_vram(byte x, byte y) {
 
   // wait for VBLANK to start
   ppu_wait_nmi();
+  //ppu_off();
   // set vram address and read byte into rd
   vram_adr(addr);
   vram_read(&rd, 1);
   // scroll registers are corrupt
   // fix by setting vram address
-  addr = setVRAMAddress(0, 0, true);
+  
+  //setVRAMAddress(0, 0, true);
+  vram_adr(0x00);
+  
+  //ppu_on_all();
   return rd;
 }
 
@@ -323,6 +330,7 @@ byte countUp(char lookForMe, byte useDoorLocation, char * DoorInfo)
       }
     }
   }
+  setVRAMAddress(0,0,true);
   return count;
 }
 
@@ -430,15 +438,30 @@ void loadWorld()
   word addr;
 
   scrollSwap = !scrollSwap;
-  addr = setVRAMAddress(0, 0, true);
+  
+  if(scrollSwap)
+  {
+    addr = NTADR_B(0,0);
+  }
+  else
+  {
+    addr = NTADR_A(0,0);
+  }
+  
+  //vrambuf_flush();
+  vram_adr(addr);
+  
+  //addr = setVRAMAddress(0, 0, true);
 
   ppu_off();
-  vram_inc(0);
+  
+  
+  //vram_inc(0);
   vram_unrle(worldData[worldNumber]);
-  //ppu_on_all();
-  vrambuf_flush();
+  //vrambuf_flush();
 
-  addr = setVRAMAddress(0, 0, true);
+  //addr = setVRAMAddress(0, 0, true);
+  vram_adr(addr);
 
 
   while(tileNum < LargestWorld)
@@ -492,9 +515,10 @@ void loadWorld()
 
   }
 
-  debugnameTable();
-
   ppu_on_all();
+  
+  ppu_wait_nmi();
+  debugnameTable();
 
   if(worldNumber == 0)
   {
@@ -1043,8 +1067,9 @@ void main(void) {
   worldScrolling = false;
   scrollSwap = !worldScrolling;
   old_worldScrolling = worldScrolling;
+  worldNumber = 0;
   transition = 0x01;
-  
+
   pal_all(PALETTE);// generally before game loop (in main)
 
   feet.act.x = 0;
@@ -1072,7 +1097,7 @@ void main(void) {
   randomizeParticle(singleBricks, brickSpeed, 0, 0);
   // enable PPU rendeing (turn on screen)
 
-  worldNumber = 0;
+  
   loadWorld();
   updatePlayerSprites();
   //debugDisplayShadow();
