@@ -116,7 +116,7 @@ byte scrollSwap = false;
 word setVRAMAddress(int x, int y, byte setNow )
 {
   word addr;
-  if(scrollSwap == false)
+  if(scrollSwap == true)
   {
     addr = NTADR_B(x,y);
   }
@@ -146,7 +146,7 @@ byte getchar_vram(byte x, byte y) {
   vram_read(&rd, 1);
   // scroll registers are corrupt
   // fix by setting vram address
-  vram_adr(0x0);
+  addr = setVRAMAddress(0, 0, true);
   return rd;
 }
 
@@ -750,7 +750,7 @@ void updatePlayerSprites()
 }
 
 
-byte old_worldScrolling = true;
+byte old_worldScrolling = false;
 byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
 {
   int deltaX = 0, deltaY = 0;
@@ -766,11 +766,14 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
     old_worldScrolling = true;
 
 
-
+    setVRAMAddress(0,0,true);
     loadWorld();
+    setVRAMAddress(0,0,true);
     
-
+    //scrollSwap = !scrollSwap;
+    
     //swaps it if needed... (since if you last scrolled right, now you need to scroll left...)
+    
     if(direction == 0x02 && scrollSwap == 0)
     {
       direction == 0x01;
@@ -790,6 +793,12 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
     {
       direction == 0x04;
     }
+    
+    if(direction != 0)
+    {
+      outsideHelper = direction;
+    }
+    
 
     if(direction == 0x02)
     {
@@ -854,8 +863,10 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
     if(direction == 0x01)
     {
       //left
-      if(world_x <= 0)
+      if(world_x <= -256)
       {
+        world_x = 0;
+        world_y = 0;
         old_worldScrolling = false;
         player.act.x = 256-24;
         worldScrolling = false;
@@ -867,6 +878,8 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
       //right
       if(world_x >= 256)
       {
+        world_x = 0;
+        world_y = 0;
         old_worldScrolling = false;
         player.act.x = 8;
         worldScrolling = false;
@@ -879,6 +892,8 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
       //up
       if(world_y <= -256)
       {
+        world_x = 0;
+        world_y = 0;
         old_worldScrolling = false;
         player.act.x = 8;
         worldScrolling = false;
@@ -890,6 +905,8 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
       //down
       if(world_y >= 256)
       {
+        world_x = 0;
+        world_y = 0;
         old_worldScrolling = false;
         player.act.x = 8;
         worldScrolling = false;
@@ -1023,8 +1040,11 @@ void main(void) {
   byte Up_Down = 0;
   byte lastTouch = 0;
 
-  //worldScrolling = true;
-
+  worldScrolling = false;
+  scrollSwap = !worldScrolling;
+  old_worldScrolling = worldScrolling;
+  transition = 0x01;
+  
   pal_all(PALETTE);// generally before game loop (in main)
 
   feet.act.x = 0;
