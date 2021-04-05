@@ -418,6 +418,8 @@ void debugDisplayShadow()
   ppu_on_all();
 }
 
+#define pastHereBeBlocks 0x70
+
 void loadWorld()
 { 
   int i = 0;
@@ -437,6 +439,8 @@ void loadWorld()
   vrambuf_flush();
 
   addr = setVRAMAddress(0, 0, true);
+
+
   while(tileNum < LargestWorld)
   {
     int y = tileNum / NUM_SHADOW_COL; //tileNum / 32 = y value
@@ -465,7 +469,7 @@ void loadWorld()
         numDoors++;
       }
 
-      if((current[x] & 0xF0) > 0x70)
+      if((current[x] & 0xF0) > pastHereBeBlocks)
       {
         shadowBits = 0x03; //breakable and ground
       }
@@ -511,6 +515,12 @@ void loadWorld()
 
   //numDoors = countUp(0xC4, true, DoorInfo);
   //debugDisplayShadow();
+
+  {
+    char dx[32];
+    sprintf(dx, "%d", addr);
+    updateScreen(2, 2, dx, 32);
+  }
 
 }
 
@@ -894,12 +904,12 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
 char selectedPosition[3];
 const char playerPlaceBlock = 0xC0;
 
-void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacingRight, int offset)
+void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacingRight, int offset, byte findEmpty)
 {
   byte breakBlock = searchPlayer(playerX, playerY + (upOffset*8), 0, lastFacingRight, offset);
   int itemX, itemY, collision;
   byte suitableOption = true;
-  
+
   selectedPosition[2] = 1;
 
   if(lastFacingRight)
@@ -911,12 +921,12 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
     collision = 1;
   }
 
-  if((breakBlock & 0x02) != 0)
+  if((breakBlock & 0x02) != findEmpty)
   {
     itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
     itemY = playerY/8 + 1;
   }
-  else if((breakBlock & 0x01) != 0)
+  else if((breakBlock & 0x01) != findEmpty)
   {
     itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
     itemY = playerY/8;
@@ -932,12 +942,12 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
       collision = 2;
     }
 
-    if((breakBlock & 0x08) != 0)
+    if((breakBlock & 0x08) != findEmpty)
     {
       itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
       itemY = playerY/8 + 1;
     }
-    else if((breakBlock & 0x04) != 0)
+    else if((breakBlock & 0x04) != findEmpty)
     {
       itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
       itemY = playerY/8;
@@ -953,7 +963,7 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
   if(suitableOption == false)
   {
     selectedPosition[2] = 0;
-    
+
     if(lastFacingRight)
     {
       collision = -2;
@@ -962,8 +972,9 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
     {
       collision = 1;
     }
-    itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset) + (lastFacingRight*2 -1);
-    itemY = playerY/8 + 1;
+    //lastFacingRight == true/1 -> 0, lastFacingRight == false/0 -> -1.. lastFacingRight-1 
+    itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset + (lastFacingRight - 1));
+    itemY = playerY/8 + 1 + upOffset;
   }
   selectedPosition[0] = itemX;
   selectedPosition[1] = itemY;
@@ -1257,7 +1268,7 @@ void main(void) {
         {
           upOffset = 0;
         }
-        setSelectedPosition(player.act.x, player.act.y, upOffset, lastFacingRight, offset);
+        setSelectedPosition(player.act.x, player.act.y, upOffset, lastFacingRight, offset, 0);
 
         if(swing == 0)
         {
@@ -1691,15 +1702,20 @@ void main(void) {
     {
 
       cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
+
       if((pad_result&0x08)>>3)
       {
-        ppu_off();
-        //ppu_wait_nmi();
-        setVRAMAddress(selectedPosition[0], selectedPosition[1], true);
-        vram_put(playerPlaceBlock);
-        ppu_on_all();
+        char current = getchar_vram(selectedPosition[0], selectedPosition[1]);
+        if( (current & 0xF0) < pastHereBeBlocks)
+        {
+          ppu_off();
+          //ppu_wait_nmi();
+          setVRAMAddress(selectedPosition[0], selectedPosition[1], true);
+          vram_put(playerPlaceBlock);
+          ppu_on_all();
 
-        setGround(selectedPosition[0], selectedPosition[1], 0x03);
+          setGround(selectedPosition[0], selectedPosition[1], 0x03);
+        }
       }
     }
 
