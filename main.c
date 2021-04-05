@@ -19,6 +19,8 @@
 
 //#link "vrambuf.c"
 
+#define SELECTED 0xB0
+
 // define a 2x2 metasprite
 #define DEF_METASPRITE_2x2(name, code, attribute)\
   unsigned char name[]={\
@@ -957,7 +959,7 @@ void main(void) {
   randomizeParticle(singleBricks, brickSpeed, 0, 0);
   // enable PPU rendeing (turn on screen)
 
-  worldNumber = 1;
+  worldNumber = 0;
   loadWorld();
   updatePlayerSprites();
   //debugDisplayShadow();
