@@ -116,7 +116,7 @@ byte scrollSwap = false;
 word setVRAMAddress(int x, int y, byte setNow )
 {
   word addr;
-  if(scrollSwap == true)
+  if(scrollSwap == false)
   {
     addr = NTADR_B(x,y);
   }
@@ -359,18 +359,18 @@ void debugnameTable()
   {
     addr = NTADR_A(0,0);
     sprintf(dx, "NametableA: %d   ", addr);
-    updateScreen(2, 6, dx, 32);
+    updateScreen(2, 2, dx, 32);
   }
-  if(scrollSwap)
+  else
   {
     addr = NTADR_B(0,0); 
     sprintf(dx, "NametableB: %d   ", addr);
-    updateScreen(2, 7, dx, 32);
+    updateScreen(2, 2, dx, 32);
   }
 
 
   sprintf(dx, "world #: %d        ", worldNumber);
-  updateScreen(2, 5, dx, 32);
+  updateScreen(2, 3, dx, 32);
 
   sprintf(dx, "scrollSwap: %d     ", scrollSwap);
   updateScreen(2, 4, dx, 32);
@@ -492,7 +492,7 @@ void loadWorld()
 
   }
 
-
+  debugnameTable();
 
   ppu_on_all();
 
@@ -516,11 +516,12 @@ void loadWorld()
   //numDoors = countUp(0xC4, true, DoorInfo);
   //debugDisplayShadow();
 
-  {
+  
+  /*{
     char dx[32];
     sprintf(dx, "%d", addr);
     updateScreen(2, 2, dx, 32);
-  }
+  }*/
 
 }
 
@@ -767,6 +768,7 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
 
 
     loadWorld();
+    
 
     //swaps it if needed... (since if you last scrolled right, now you need to scroll left...)
     if(direction == 0x02 && scrollSwap == 0)
@@ -895,7 +897,7 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
       }
     }
   }
-
+  
   //old_worldScrolling = worldScrolling;
   return worldScrolling;
 }
@@ -1009,6 +1011,8 @@ void main(void) {
 
   short brickSpeed = 5;
   short brickLifetime = 10;
+  short digTimer = 0;
+  short digWait = 2;
 
   unsigned int i = 0, j = 0;
 
@@ -1019,7 +1023,7 @@ void main(void) {
   byte Up_Down = 0;
   byte lastTouch = 0;
 
-  worldScrolling = true;
+  //worldScrolling = true;
 
   pal_all(PALETTE);// generally before game loop (in main)
 
@@ -1083,9 +1087,10 @@ void main(void) {
     {
       if(((res & 0x0C) >> 2) != 0 && lastFacingRight || ((res & 0x03)) != 0 && !lastFacingRight )
       {
+        /*
         int collision;
 
-
+        
         {
           //1,2,4,8 bits 
           //1 & 2 = front 2
@@ -1095,6 +1100,7 @@ void main(void) {
             //meaning we're moving right and the player's front 2 blocks are IN ground block...
             if(lastFacingRight)
             {
+              //collision = -2;
               collision = -2;
             }
             else
@@ -1104,7 +1110,8 @@ void main(void) {
             player.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision)*8;
           }
         }
-
+        */
+        
         player.act.dx = 0;
       }
 
@@ -1705,16 +1712,52 @@ void main(void) {
 
       if((pad_result&0x08)>>3)
       {
-        char current = getchar_vram(selectedPosition[0], selectedPosition[1]);
-        if( (current & 0xF0) < pastHereBeBlocks)
+        int deltaX = 0;
+        int deltaY = 0;
+        char current = checkGround(selectedPosition[0], selectedPosition[1], 0) | checkGround(selectedPosition[0], selectedPosition[1],1);
+        
+        
+        
+        if(current != 0)
         {
-          ppu_off();
-          //ppu_wait_nmi();
-          setVRAMAddress(selectedPosition[0], selectedPosition[1], true);
-          vram_put(playerPlaceBlock);
-          ppu_on_all();
-
-          setGround(selectedPosition[0], selectedPosition[1], 0x03);
+          if(Up_Down == 0x00)
+          {
+            deltaX = (1-lastFacingRight)*2 -1;
+            current = checkGround(selectedPosition[0] + deltaX, selectedPosition[1], 0) | checkGround(selectedPosition[0] + deltaX, selectedPosition[1],1);
+          }
+          else
+          {
+            if(Up_Down == 0x01)
+            {
+              // up
+              deltaY = -1;
+            }
+            else if(Up_Down == 0x02)
+            {
+              // down
+              deltaY = 1;
+            }
+            current = checkGround(selectedPosition[0], selectedPosition[1]+deltaY, 0) | checkGround(selectedPosition[0], selectedPosition[1]+deltaY,1);
+          }
+        }
+        if(current == 0)
+        {
+          if(digTimer <= 0)
+          {
+            ppu_off();
+            //ppu_wait_nmi();
+            setVRAMAddress(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, true);
+            vram_put(playerPlaceBlock);
+            ppu_on_all();
+            setGround(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, 0x03);
+            
+            digTimer = digWait;
+          }
+          else
+          {
+            digTimer--;
+          }
+          
         }
       }
     }
