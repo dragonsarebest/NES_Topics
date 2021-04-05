@@ -521,7 +521,7 @@ byte loadWorld()
   }
   vram_adr(addr);
 
-  ppu_on_all();
+  
 
   //ppu_wait_nmi();
   //debugnameTable();
@@ -543,6 +543,9 @@ byte loadWorld()
     }
   }
 
+  
+  ppu_on_all();
+  
   //numDoors = countUp(0xC4, true, DoorInfo);
   //debugDisplayShadow();
 
@@ -800,38 +803,38 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
 
     setVRAMAddress(0,0,true);
     returnVal = loadWorld();
-    ppu_wait_nmi();
-    setVRAMAddress(0,0,true);
+    //ppu_wait_nmi();
+    //setVRAMAddress(0,0,true);
+    //debugnameTable();
 
     //scrollSwap = !scrollSwap;
 
     //swaps it if needed... (since if you last scrolled right, now you need to scroll left...)
 
-    if(direction == 0x02 && scrollSwap == 0)
+    //outsideHelper = direction;
+    
+    if(direction == 0x02 && scrollSwap == 1)
     {
       direction == 0x01;
     }
 
-    if(direction == 0x01 && scrollSwap == 1)
+    else if(direction == 0x01 && scrollSwap == 0)
     {
       direction == 0x02;
     }
 
-    if(direction == 0x04 && scrollSwap == 0)
+    else if(direction == 0x04 && scrollSwap == 1)
     {
       direction == 0x03;
     }
 
-    if(direction == 0x03 && scrollSwap == 1)
+    else if(direction == 0x03 && scrollSwap == 0)
     {
       direction == 0x04;
     }
 
-    if(direction != 0)
-    {
-      outsideHelper = direction;
-    }
-
+    //outsideHelper2 = direction;
+    transition = direction;
 
     if(direction == 0x02)
     {
@@ -899,8 +902,8 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
       //left
       if(world_x <= -256)
       {
-        world_x = 0;
-        world_y = 0;
+        //world_x = 0;
+        //world_y = 0;
         old_worldScrolling = false;
         player.act.x = 256-24;
         worldScrolling = false;
@@ -912,8 +915,8 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
       //right
       if(world_x >= 256)
       {
-        world_x = 0;
-        world_y = 0;
+        //world_x = 0;
+        //world_y = 0;
         old_worldScrolling = false;
         player.act.x = 8;
         worldScrolling = false;
@@ -926,8 +929,8 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
       //up
       if(world_y <= -256)
       {
-        world_x = 0;
-        world_y = 0;
+        //world_x = 0;
+        //world_y = 0;
         old_worldScrolling = false;
         player.act.x = 8;
         worldScrolling = false;
@@ -939,8 +942,8 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
       //down
       if(world_y >= 256)
       {
-        world_x = 0;
-        world_y = 0;
+        //world_x = 0;
+        //world_y = 0;
         old_worldScrolling = false;
         player.act.x = 8;
         worldScrolling = false;
@@ -1509,7 +1512,7 @@ void main(void) {
               //instead go to new world
               worldNumber = StairsGoToWorld[i];
               worldScrolling = true;
-              //transition = 0x01;
+              
               ppu_off();
             }
           }
