@@ -465,9 +465,9 @@ byte loadWorld()
   vram_adr(addr);
   //ppu_on_all();
 
-  worldScrolling = true;
-  worldNumber = 1;
-  if(temp){
+  
+  //if(temp)
+  {
     while(tileNum < LargestWorld)
     {
       int y = tileNum / NUM_SHADOW_COL; //tileNum / 32 = y value
@@ -950,6 +950,15 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
   }
 
   //old_worldScrolling = worldScrolling;
+  /*
+  if(worldScrolling == false && worldNumber == 0)
+  {
+    worldScrolling = true;
+    worldNumber = 1;
+    
+    ppu_off();
+  }
+  */
 }
 
 
@@ -1502,6 +1511,7 @@ void main(void) {
               worldScrolling = true;
               //transition = 0x01;
               transition = 0x00;
+              ppu_off();
             }
           }
         }
