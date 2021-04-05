@@ -435,7 +435,7 @@ void loadWorld()
   vram_unrle(worldData[worldNumber]);
   //ppu_on_all();
   vrambuf_flush();
-  
+
   addr = setVRAMAddress(0, 0, true);
   while(tileNum < LargestWorld)
   {
@@ -487,8 +487,8 @@ void loadWorld()
 
 
   }
-  
- 
+
+
 
   ppu_on_all();
 
@@ -508,7 +508,7 @@ void loadWorld()
       StairsGoToWorld[i] = 0;
     }
   }
-  
+
   //numDoors = countUp(0xC4, true, DoorInfo);
   //debugDisplayShadow();
 
@@ -891,6 +891,84 @@ byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
 }
 
 
+char selectedPosition[3];
+const char playerPlaceBlock = 0xC0;
+
+void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacingRight, int offset)
+{
+  byte breakBlock = searchPlayer(playerX, playerY + (upOffset*8), 0, lastFacingRight, offset);
+  int itemX, itemY, collision;
+  byte suitableOption = true;
+  
+  selectedPosition[2] = 1;
+
+  if(lastFacingRight)
+  {
+    collision = -2;
+  }
+  else
+  {
+    collision = 1;
+  }
+
+  if((breakBlock & 0x02) != 0)
+  {
+    itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
+    itemY = playerY/8 + 1;
+  }
+  else if((breakBlock & 0x01) != 0)
+  {
+    itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
+    itemY = playerY/8;
+  }
+  else
+  {
+    if(lastFacingRight)
+    {
+      collision = -1;
+    }
+    else
+    {
+      collision = 2;
+    }
+
+    if((breakBlock & 0x08) != 0)
+    {
+      itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
+      itemY = playerY/8 + 1;
+    }
+    else if((breakBlock & 0x04) != 0)
+    {
+      itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
+      itemY = playerY/8;
+    }
+    else
+    {
+      suitableOption = false; 
+    }
+  }
+
+  itemY += upOffset;
+
+  if(suitableOption == false)
+  {
+    selectedPosition[2] = 0;
+    
+    if(lastFacingRight)
+    {
+      collision = -2;
+    }
+    else
+    {
+      collision = 1;
+    }
+    itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset) + (lastFacingRight*2 -1);
+    itemY = playerY/8 + 1;
+  }
+  selectedPosition[0] = itemX;
+  selectedPosition[1] = itemY;
+}
+
 char groundBlock[6];
 
 // main function, run after console reset
@@ -1195,24 +1273,27 @@ void main(void) {
 
       if(!worldScrolling)
       {
+        byte offset = 1;
+        int upOffset = 0;
+        if(Up_Down == 0x01)
+        {
+          // up
+          upOffset = 1;
+        }
+        else if(Up_Down == 0x02)
+        {
+          // down
+          upOffset = -1;
+        }
+        else
+        {
+          upOffset = 0;
+        }
+        setSelectedPosition(player.act.x, player.act.y, upOffset, lastFacingRight, offset);
+
         if(swing == 0)
         {
-          byte offset = 1;
-          int upOffset = 0;
-          if(Up_Down == 0x01)
-          {
-            // up
-            upOffset = 1;
-          }
-          else if(Up_Down == 0x02)
-          {
-            // down
-            upOffset = -1;
-          }
-          else
-          {
-            upOffset = 0;
-          }
+
           breakBlock = searchPlayer(player.act.x, player.act.y + (upOffset*8), 0, lastFacingRight, offset);
           //1101
           if(breaking)
@@ -1535,7 +1616,7 @@ void main(void) {
     //0x01 = left, 0x02 = right, 0x03 = up, 0x04 = down
     //transition = 0x02;
     worldScrolling = scrollWorld(transition, &player, worldScrolling);
-    
+
     {
       //animate the player!
       byte shoudlRun = true;
@@ -1638,6 +1719,21 @@ void main(void) {
       }
       */
 
+
+    {
+
+      cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
+      if((pad_result&0x08)>>3)
+      {
+        ppu_off();
+        //ppu_wait_nmi();
+        setVRAMAddress(selectedPosition[0], selectedPosition[1], true);
+        vram_put(playerPlaceBlock);
+        ppu_on_all();
+
+        setGround(selectedPosition[0], selectedPosition[1], 0x03);
+      }
+    }
 
     oam_hide_rest(cur_oam);
     //this makes it wait one frame in between updates
