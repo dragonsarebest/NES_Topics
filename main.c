@@ -1059,7 +1059,6 @@ void main(void) {
         res = res | groundBlock[i];
       }
 
-
       if(res != 0)
       {
         player.act.grounded = true;
