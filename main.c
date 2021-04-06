@@ -772,6 +772,21 @@ void updatePlayerSprites()
 }
 
 
+byte brightness = 4;
+void pal_fade_to(unsigned to)
+{
+  //if(!to) music_stop();
+  while(brightness!=to)
+  {
+    delay(4);
+    if(brightness<to) ++brightness; 
+    else --brightness;
+    pal_bright(brightness);
+  }
+}
+
+
+
 void setNewPlayerPos()
 {
   int i;
@@ -784,6 +799,7 @@ void setNewPlayerPos()
       break;
     }
   }
+  pal_fade_to(6);
 }
 
 byte old_worldScrolling = false;
@@ -796,15 +812,19 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
   playerDeltaX = PlayerActor->act.dx * PlayerActor->act.moveSpeed;
   playerDeltaY = PlayerActor->act.dy * PlayerActor->act.jumpSpeed;
 
-  outsideHelper = direction;
+  
+  if(old_worldScrolling == false && worldScrolling == false)
+  {
+    pal_fade_to(4);
+  }
 
   if(old_worldScrolling == false && worldScrolling == true)
   {
     old_worldScrolling = true;
 
-
     setVRAMAddress(0,0,true);
     returnVal = loadWorld();
+    pal_fade_to(2);
 
     if(direction == 0x02 && scrollSwap == 1)
     {
@@ -826,7 +846,6 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
       direction = 0x04;
     }
 
-    outsideHelper2 = direction;
     transition = direction;
 
     if(direction == 0x02)
@@ -853,6 +872,7 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
 
   if(worldScrolling == false)
   {
+    
     PlayerActor->act.x += playerDeltaX;
     PlayerActor->act.y += playerDeltaY;
   }
@@ -884,9 +904,6 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
     }
     
     transition = direction;
-    outsideHelper = direction;
-    outsideHelper2 = deltaX;
-    outsideHelper3 = world_x;
 
     world_x += deltaX;
     PlayerActor->act.x -= deltaX;
