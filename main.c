@@ -48,14 +48,34 @@ int outsideHelper2;
 int outsideHelper3;
 int outsideHelper4;
 int outsideHelper5;
+int outsideHelper6;
 
 #define SHADOW_SIZE (NUM_SHADOW_ROW * NUM_SHADOW_COL)/4
 char shadow[SHADOW_SIZE];
 
-int outsideHelper6;
+byte UpTo8DoorsOpen = 0;
+//8*2char's 
+char DoorInfo[8];
+char StairsGoToWorld[8];
+char DoorPositions[16];
+byte numDoors;
+byte old_worldNumber;
+//each bit represents one door, ordered left to right up down.
+
+#define MAX_JUMP 7
+int jumpTable[MAX_JUMP] = 
+{
+  -4, -2, -1, 0, 1, 2, 4
+  };
+
+#define NUM_BRICKS 16
 
 #define NumWorlds 2
 #define LargestWorld NUM_SHADOW_ROW * NUM_SHADOW_COL
+char worldNumber;
+char transition;
+byte scrollSwap;
+byte worldScrolling;
 //960 is the largest map size...
 const char worldData[NumWorlds][LargestWorld] = {
   {
@@ -102,10 +122,7 @@ const char worldData[NumWorlds][LargestWorld] = {
     0x01,0x3f,0x00,0x01,0x00
     }
 };
-char worldNumber;
-char transition;
-byte scrollSwap;
-byte worldScrolling;
+
 
 word setVRAMAddress(int x, int y, byte setNow )
 {
@@ -279,13 +296,7 @@ byte aboveOrBellowPlayer(unsigned char x, unsigned char y, byte groundOrBreak, b
   return inFront;
 }
 
-byte UpTo8DoorsOpen = 0;
-//8*2char's 
-char DoorInfo[8];
-char StairsGoToWorld[8];
-char DoorPositions[16];
-byte numDoors;
-//each bit represents one door, ordered left to right up down.
+
 
 byte countUp(char lookForMe, byte useDoorLocation, char * DoorInfo)
 {
@@ -512,11 +523,6 @@ byte loadWorld()
   }
   vram_adr(addr);
 
-
-
-  //ppu_wait_nmi();
-  //debugnameTable();
-
   if(worldNumber == 0)
   {
     //set all world stair destinations here!
@@ -619,18 +625,9 @@ char PALETTE[32] =
   0x1d, 0x37, 0x2b,// sprite palette 3
 };
 
-#define MAX_JUMP 7
-int jumpTable[MAX_JUMP] = 
-{
-  -4, -2, -1, 0, 1, 2, 4
-  };
 
-#define NUM_BRICKS 16
 
 //functions defined here
-
-
-
 void updateMetaSprite(unsigned char attribute, unsigned char * meta)
 {
   //palette, is behind, flip_hor, flip_vert
@@ -775,6 +772,20 @@ void updatePlayerSprites()
 }
 
 
+void setNewPlayerPos()
+{
+  int i;
+  for(i = 0; i < 8; i++)
+  {
+    if(StairsGoToWorld[i] == old_worldNumber)
+    {
+      player.act.x = DoorPositions[i*2]*8;
+      player.act.y = DoorPositions[i*2 + 1]*8;
+      break;
+    }
+  }
+}
+
 byte old_worldScrolling = false;
 void scrollWorld(byte direction, MetaActor* PlayerActor)
 {
@@ -897,7 +908,7 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
         old_worldScrolling = false;
         player.act.x = 256-24;
         worldScrolling = false;
-        //world_x = 0;
+        setNewPlayerPos();
       }
     }
     else if(direction == 0x02)
@@ -910,7 +921,7 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
         old_worldScrolling = false;
         player.act.x = 8;
         worldScrolling = false;
-        //world_x = 256;
+        setNewPlayerPos();
       }
 
     }
@@ -924,7 +935,7 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
         old_worldScrolling = false;
         player.act.x = 8;
         worldScrolling = false;
-        //world_y = 0;
+        setNewPlayerPos();
       }
     }
     else if(direction == 0x04)
@@ -937,21 +948,10 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
         old_worldScrolling = false;
         player.act.x = 8;
         worldScrolling = false;
-        //world_y = 0;
+        setNewPlayerPos();
       }
     }
   }
-
-  //old_worldScrolling = worldScrolling;
-  /*
-  if(worldScrolling == false && worldNumber == 0)
-  {
-    worldScrolling = true;
-    worldNumber = 1;
-
-    ppu_off();
-  }
-  */
 }
 
 
@@ -1034,6 +1034,12 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
   selectedPosition[1] = itemY;
 }
 
+void setWorldNumber(byte num)
+{
+  old_worldNumber = worldNumber;
+  worldNumber = num;
+}
+
 char groundBlock[6];
 
 // main function, run after console reset
@@ -1102,16 +1108,11 @@ void main(void) {
     player.act.dy = 1;
   }
 
-
   randomizeParticle(singleBricks, brickSpeed, 0, 0);
   // enable PPU rendeing (turn on screen)
 
-
   loadWorld();
-
-
-
-
+  
   updatePlayerSprites();
   //debugDisplayShadow();
 
@@ -1500,7 +1501,8 @@ void main(void) {
             {
               jumping = false;
               //instead go to new world
-              worldNumber = StairsGoToWorld[i];
+             
+              setWorldNumber(StairsGoToWorld[i]);
               worldScrolling = true;
 
               ppu_off();
