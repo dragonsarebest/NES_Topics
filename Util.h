@@ -36,3 +36,4 @@ typedef struct MetaActor
   Actor act;
   unsigned char * metasprite;
 } MetaActor;
+

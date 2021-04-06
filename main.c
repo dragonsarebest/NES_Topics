@@ -253,77 +253,6 @@ void writeBinary(unsigned char x, unsigned char y, byte value)
   updateScreen(x, y, dx, 16);
 }
 
-/*
-void debugnameTable()
-{
-  char dx[32];
-  word addr;
-
-  if(!scrollSwap)
-  {
-    addr = NTADR_A(0,0);
-    sprintf(dx, "NametableA: %d   ", addr);
-    updateScreen(2, 2, dx, 32);
-  }
-  else
-  {
-    addr = NTADR_B(0,0); 
-    sprintf(dx, "NametableB: %d   ", addr);
-    updateScreen(2, 2, dx, 32);
-  }
-
-
-  sprintf(dx, "world #: %d        ", worldNumber);
-  updateScreen(2, 3, dx, 32);
-
-  sprintf(dx, "scrollSwap: %d     ", scrollSwap);
-  updateScreen(2, 4, dx, 32);
-
-}
-
-
-void debugDisplayShadow()
-{
-
-  int rleInt, x, y, ground, breakable;
-
-  ppu_off();
-
-  setVRAMAddress(0, 0, true);
-
-  for(rleInt = 0; rleInt < LargestWorld; rleInt++)
-  {
-    y = rleInt / NUM_SHADOW_COL; //tileNum / 32 = y value
-    x = rleInt % NUM_SHADOW_COL;
-
-    ground = checkGround(x, y, 1);
-    breakable = checkGround(x, y, 0);
-
-    if(ground && !breakable)
-    {
-      vram_put(0x01);
-      //vram_put(0x05);
-    }
-    else if(breakable && ! ground)
-    {
-      vram_put(0x02);
-    }
-    else if(ground && breakable)
-    {
-      vram_put(0x03);
-    }
-    else
-    {
-      vram_put(0x00);
-    }
-
-
-  }
-  ppu_on_all();
-}
-
-*/
-
 byte loadWorld()
 { 
   int i = 0;
@@ -486,32 +415,7 @@ void updateMetaSprite(unsigned char attribute, unsigned char * meta)
 }
 
 
-void writeText(char * data, unsigned char addressX, unsigned char addressY)
-{
-  char * line = data;
-  int startIndex = 0;
-  int currentIndex = 0;
-  //set init address
 
-  while(*data)
-  {
-    //newline = 10
-    if(data[0] == 10)
-    {
-      vram_write(line, currentIndex-startIndex);
-      line = data+1;
-      startIndex = currentIndex+1;
-      addressY++;
-      setVRAMAddress(addressX, addressY, true);
-    }
-    currentIndex++;
-    data++;
-  }
-  if(startIndex!=currentIndex)
-  {
-    vram_write(line, currentIndex-startIndex);
-  }
-}
 
 void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
 {
