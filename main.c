@@ -526,6 +526,11 @@ byte loadWorld()
         {
           shadowBits = 0x01; // just breakable
         }
+        
+        if(y <= 5)
+        {
+          shadowBits = 0;
+        }
 
         setGround(x, y, shadowBits);
 
@@ -1072,13 +1077,15 @@ void updatePlayerHealth(int health, MetaActor * player)
   int i;
   char hearts[10];
   
-  if(player->act.alive <= health)
+  health = player->act.alive - health;
+  
+  if(health <= 0)
   {
     player->act.alive = 0;
   }
   else
   {
-    player->act.alive -= health;
+    player->act.alive = health;
   }
   
   for(i = 1; i < 11; i++)
@@ -1214,7 +1221,7 @@ void main(void) {
 
   updatePlayerSprites();
   //debugDisplayShadow();
-
+  
   ppu_on_all();
 
   //always updates @ 60fps
@@ -1232,8 +1239,6 @@ void main(void) {
     //cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
     cur_oam = 4;
     
-    
-
 
     player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6) ;
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, 0);
@@ -1245,33 +1250,30 @@ void main(void) {
     }
     else
     {
-      if(((res & 0x0C) >> 2) != 0 && lastFacingRight || ((res & 0x03)) != 0 && !lastFacingRight )
+      if((pad_result & 0x80)>>7 && lastFacingRight == false)
       {
-        /*
-        int collision;
-
-
+        lastFacingRight = true;
+      }
+      else
+      {
+        if((pad_result & 0x40)>>6 && lastFacingRight)
         {
-          //1,2,4,8 bits 
-          //1 & 2 = front 2
-          //4 & 8 = back 2
-          if(((res & 0x0C) >> 2) > 0)
-          {
-            //meaning we're moving right and the player's front 2 blocks are IN ground block...
-            if(lastFacingRight)
-            {
-              //collision = -2;
-              collision = -2;
-            }
-            else
-            {
-              collision = 1;
-            }
-            player.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision)*8;
-          }
+          lastFacingRight = false;
         }
-        */
-
+      }
+      {
+        player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
+        updatePlayerSprites();
+      }
+      
+      if((res & 0x0C) != 0 && player.act.dx > 0)
+      {
+        //player.act.dx = -1;
+        player.act.dx = 0;
+      }
+      if((res & 0x03) != 0 && player.act.dx < 0)
+      {
+        //player.act.dx = 1;
         player.act.dx = 0;
       }
 
@@ -1323,24 +1325,6 @@ void main(void) {
       }
 
 
-
-      if((pad_result & 0x80)>>7 && lastFacingRight == false)
-      {
-        lastFacingRight = true;
-      }
-      else
-      {
-        if((pad_result & 0x40)>>6 && lastFacingRight)
-        {
-          lastFacingRight = false;
-        }
-      }
-      {
-        player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
-        updatePlayerSprites();
-      }
-
-
       {
         byte shift = pad_result & 0x02;
         jumping = pad_result & 0x10;
@@ -1353,16 +1337,13 @@ void main(void) {
           //cannot jump & break @ same time
         }
 
-
-        
-        
         //Up_Down = 0;
         if(shift)
         {
           if((pad_result & 0x20))
           {
             noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, false, lastFacingRight, 0);
-            if(noBlocksAbove != 0)
+            //if(noBlocksAbove != 0)
             {
               //pressing down on keypad
               Up_Down = 0x01;
@@ -1708,6 +1689,7 @@ void main(void) {
 
 
         //if(player.act.grounded == true && ((pad_result & 0x10) >> 4))
+        //noBlocksAbove&0x01
         if(player.act.grounded == true && noBlocksAbove == 0 && jumping)
         {
           //if grounded and you try to jump...
@@ -1946,7 +1928,7 @@ void main(void) {
 
     oam_hide_rest(cur_oam);
     //this makes it wait one frame in between updates
-
+    /*
     updatePlayerHealth(1, &player);
     updateBombBlockLives(1, 0x01);
     updateBombBlockLives(1, 0x02);
@@ -1955,7 +1937,7 @@ void main(void) {
     {
       player.act.alive = 10;
     }
-    
+    */
     ppu_wait_frame();
   }
 }
