@@ -6,6 +6,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "Util.h"
+#include "Globals.h"
 
 #include <nes.h>
 #include "vrambuf.h"
@@ -15,146 +17,6 @@
 //#link "chr_generic.s"
 
 //#link "vrambuf.c"
-
-#define SELECTED 0xB0
-
-// define a 2x2 metasprite
-#define DEF_METASPRITE_2x2(name, code, attribute)\
-  unsigned char name[]={\
-          0,      0,      (code)+0,   attribute, \
-          0,      8,      (code)+1,   attribute, \
-          8,      0,      (code)+2,   attribute, \
-          8,      8,      (code)+3,   attribute, \
-          128};
-
-
-#define WORLD_WIDTH 240*2
-#define WORLD_HEIGHT 256
-
-#define NUM_SHADOW_ROW 30
-#define NUM_SHADOW_COL 32
-
-#define BYTE_PER_COL 32
-
-const int note_table[64] = {
-  2152,4063,3835,3620,3417,3225,3044,2873,
-  2712,2560,2416,2280,2152,2032,1918,1810,
-  1708,1612,1522,1437,1356,1280,1208,1140,
-  1076,1016,959,905,854,806,761,718,
-  678,640,604,570,538,508,479,452,
-  427,403,380,359,339,320,302,285,
-  269,254,240,226,214,202,190,180,
-  169,160,151,143,135,127,120,113,
-};
-
-int outsideHelper; //used for debugging
-int outsideHelper2;
-int outsideHelper3;
-
-#define SHADOW_SIZE (NUM_SHADOW_ROW * NUM_SHADOW_COL)/4
-char shadow[SHADOW_SIZE];
-
-byte UpTo8DoorsOpen = 0;
-//8*2char's 
-char DoorInfo[8];
-char StairsGoToWorld[8];
-char DoorPositions[16];
-byte numDoors;
-
-//each bit represents one door, ordered left to right up down.
-
-#define MAX_JUMP 7
-int jumpTable[MAX_JUMP] = 
-{
-  -4, -2, -1, 0, 1, 2, 4
-  };
-
-#define NUM_BRICKS 16
-
-#define NumWorlds 2
-#define LargestWorld NUM_SHADOW_ROW * NUM_SHADOW_COL
-char worldNumber;
-byte old_worldNumber;
-char transition;
-byte scrollSwap;
-byte worldScrolling;
-
-byte brightness = 4;
-
-byte numBombs = 0;
-byte numBlocks = 0;
-byte numLives = 1;
-#define pastHereBeBlocks 0x70
-
-int world_x = 0;
-int world_y = 0;
-
-DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
-MetaActor player;
-
-DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_1, 0xE0, 0);
-DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_2, 0xE4, 0);
-
-DEF_METASPRITE_2x2(PlayerMetaSprite_Jump, 0xE8, 0);
-
-DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xDC, 0);
-
-
-//960 is the largest map size...
-const char worldData[NumWorlds][LargestWorld] = {
-  {
-    0x01,0x00,0x01,0x20,0x87,0x83,0x01,0x1b,0x8b,0x00,0x00,0x85,0x48,0x50,0x00,0x15,
-    0x01,0x09,0x00,0x19,0x78,0x30,0x30,0x00,0xb2,0x78,0x30,0x30,0x00,0xb1,0x78,0x30,
-    0x31,0x8a,0x00,0x00,0x83,0x01,0x1d,0x00,0x01,0x0f,0x0f,0x01,0x03,0x00,0x01,0x05,
-    0x03,0x01,0x02,0x00,0x01,0x12,0x0f,0x0e,0x0e,0x0f,0x0f,0x00,0x01,0x04,0x03,0x01,
-    0x03,0x00,0x01,0x11,0x0f,0x0e,0x01,0x02,0x0f,0x0f,0x00,0x01,0x02,0x03,0x01,0x04,
-    0x00,0x01,0x11,0x0f,0x0e,0x01,0x03,0x0f,0x00,0x01,0x02,0x03,0x03,0x0f,0x01,0x02,
-    0x00,0x01,0x11,0x0f,0x0e,0x01,0x03,0x0f,0x00,0x01,0x02,0x03,0x03,0x0f,0x0e,0x0f,
-    0x0f,0x00,0x01,0x10,0x0f,0x0e,0x01,0x03,0x0f,0x00,0x00,0x03,0x03,0x02,0x0f,0x0e,
-    0x0e,0x0f,0x0f,0x00,0x01,0x0f,0x0f,0x0f,0x0e,0x01,0x02,0x0f,0x00,0x03,0x03,0x02,
-    0x03,0x0f,0x0e,0x01,0x02,0x0f,0x00,0x01,0x10,0x0f,0x0e,0x01,0x02,0x0f,0x03,0x01,
-    0x02,0x02,0x02,0x0f,0x0e,0x01,0x02,0x0f,0x00,0x01,0x10,0x0f,0x0e,0x01,0x02,0x0f,
-    0x02,0x03,0x02,0x01,0x02,0x0f,0x0e,0x01,0x02,0x0f,0x00,0x01,0x10,0x0f,0x0e,0x01,
-    0x02,0x0f,0x02,0x01,0x04,0x0f,0x0e,0x01,0x02,0x0f,0x00,0x01,0x0f,0x03,0x0f,0x0e,
-    0x01,0x02,0x0f,0x01,0x06,0x0e,0x01,0x02,0x0f,0x00,0x01,0x0e,0x03,0x03,0x0f,0x0e,
-    0x01,0x0c,0x0f,0x00,0x01,0x0e,0x03,0x03,0x0f,0x0e,0x01,0x0b,0x0f,0x0f,0x00,0x01,
-    0x0e,0x03,0x03,0x0f,0x0e,0x01,0x0b,0x0f,0x02,0x00,0x01,0x0d,0x03,0x02,0x03,0x0f,
-    0x0e,0x01,0x04,0xc4,0xc6,0x0e,0x01,0x04,0x0f,0x02,0x00,0x01,0x04,0x03,0x03,0x00,
-    0x01,0x06,0x02,0x03,0x02,0x0f,0x0e,0x01,0x04,0xc5,0xc7,0x0e,0x01,0x04,0x0f,0x02,
-    0x00,0x01,0x04,0x03,0x03,0x00,0x01,0x05,0x02,0x01,0x03,0xc1,0x01,0x0c,0x0f,0x02,
-    0x00,0x01,0x03,0x03,0x01,0x05,0x00,0x01,0x02,0x02,0x01,0x02,0xc1,0x01,0x0e,0x02,
-    0x00,0x01,0x03,0x03,0x02,0x02,0x03,0x01,0x03,0x00,0x00,0x02,0xc1,0x01,0x10,0x02,
-    0x00,0x01,0x03,0x02,0x03,0x02,0x01,0x03,0x03,0x03,0x02,0x02,0xc1,0x01,0x11,0x00,
-    0x01,0x02,0x02,0x01,0x09,0xc1,0x01,0x12,0x00,0x01,0x02,0x02,0x01,0x06,0xc1,0x01,
-    0x15,0x00,0x00,0x02,0x01,0x02,0xc1,0x01,0x1a,0x00,0x00,0xc0,0x01,0x1d,0x00,0x01,
-    0x3f,0x00,0x01,0x00
-    },
-
-  {
-    0x01,0x00,0x01,0x20,0x87,0x83,0x01,0x1b,0x8b,0x00,0x00,0x85,0x48,0x50,0x00,0x15,
-    0x01,0x09,0x00,0x19,0x78,0x30,0x30,0x00,0xb2,0x78,0x30,0x30,0x00,0xb1,0x78,0x30,
-    0x31,0x8a,0x00,0x00,0x83,0x01,0x1d,0x00,0x01,0x51,0x04,0x01,0x02,0x00,0x01,0x1b,
-    0x04,0x01,0x03,0x00,0x01,0x1a,0x04,0x01,0x05,0x00,0x04,0x01,0x02,0x00,0x01,0x15,
-    0x04,0x01,0x02,0x02,0x04,0x01,0x08,0x00,0x01,0x0f,0x04,0x01,0x05,0x02,0x04,0x01,
-    0x08,0x00,0x01,0x0e,0x04,0x01,0x06,0x02,0x02,0x04,0x01,0x07,0x00,0x01,0x0e,0x04,
-    0x01,0x02,0x02,0x02,0x04,0x04,0x02,0x02,0x04,0x01,0x02,0x02,0x04,0x01,0x02,0x00,
-    0x01,0x10,0x04,0x01,0x02,0x02,0x02,0x04,0x01,0x08,0x00,0x01,0x11,0x04,0x01,0x02,
-    0x02,0x04,0x01,0x05,0x02,0x04,0x01,0x02,0x00,0x01,0x11,0x04,0x01,0x02,0x02,0x02,
-    0x04,0x02,0x01,0x05,0x04,0x00,0x01,0x13,0x04,0x01,0x03,0x02,0x01,0x04,0x00,0x01,
-    0x1b,0x02,0x02,0x00,0x01,0x1d,0x02,0x02,0x00,0x01,0x1d,0x02,0x02,0x00,0x01,0x1a,
-    0x06,0x01,0x03,0x02,0x00,0x01,0x19,0x06,0x01,0x0b,0x00,0x01,0x11,0x09,0x06,0x01,
-    0x0d,0x00,0x01,0x0e,0x09,0x01,0x03,0x06,0x06,0x0f,0x06,0x01,0x08,0x09,0x01,0x02,
-    0x00,0x01,0x09,0x09,0x01,0x02,0x06,0x01,0x04,0x0f,0x01,0x02,0x06,0x01,0x09,0x09,
-    0x09,0x00,0x01,0x02,0xc4,0xc6,0x00,0x01,0x02,0x09,0x09,0x0f,0x06,0x01,0x02,0x0f,
-    0x01,0x06,0x06,0x01,0x03,0x09,0x09,0x06,0x06,0x0f,0x01,0x03,0x00,0x00,0xc5,0xc7,
-    0x00,0x00,0x0f,0x01,0x0d,0x06,0x01,0x02,0x0f,0x01,0x08,0x00,0x00,0xc0,0x01,0x1d,
-    0x00,0x01,0x3f,0x00,0x01,0x00
-    }
-};
-
-
-
-
 
 word setVRAMAddress(int x, int y, byte setNow )
 {
@@ -328,8 +190,6 @@ byte aboveOrBellowPlayer(unsigned char x, unsigned char y, byte groundOrBreak, b
   return inFront;
 }
 
-
-
 byte countUp(char lookForMe, byte useDoorLocation, char * DoorInfo)
 {
   byte count = 0;
@@ -393,6 +253,7 @@ void writeBinary(unsigned char x, unsigned char y, byte value)
   updateScreen(x, y, dx, 16);
 }
 
+/*
 void debugnameTable()
 {
   char dx[32];
@@ -461,7 +322,7 @@ void debugDisplayShadow()
   ppu_on_all();
 }
 
-
+*/
 
 byte loadWorld()
 { 
@@ -471,7 +332,6 @@ byte loadWorld()
   byte current[NUM_SHADOW_COL];
   byte doorCount = 0;
   word addr;
-  byte temp = false;
 
   scrollSwap = !scrollSwap;
 
@@ -484,10 +344,8 @@ byte loadWorld()
     addr = NTADR_A(0,0);
   }
 
-  //vrambuf_flush();
   vram_adr(addr);
 
-  //addr = setVRAMAddress(0, 0, true);
 
   ppu_off();
 
@@ -496,12 +354,9 @@ byte loadWorld()
   vram_unrle(worldData[worldNumber]);
   vrambuf_flush();
 
-  //addr = setVRAMAddress(0, 0, true);
   vram_adr(addr);
-  //ppu_on_all();
 
 
-  //if(temp)
   {
     while(tileNum < LargestWorld)
     {
@@ -560,10 +415,6 @@ byte loadWorld()
     }
   }
 
-
-
-  vram_adr(addr);
-
   if(worldNumber == 0)
   {
     //set all world stair destinations here!
@@ -581,80 +432,11 @@ byte loadWorld()
     }
   }
 
-
+  vram_adr(addr);
   ppu_on_all();
-
-  //numDoors = countUp(0xC4, true, DoorInfo);
-  //debugDisplayShadow();
-
-
-  /*{
-    char dx[32];
-    sprintf(dx, "%d", addr);
-    updateScreen(2, 2, dx, 32);
-  }*/
 
   return true;
 }
-
-
-
-
-typedef struct Particles
-{
-  unsigned char x;
-  unsigned char y;
-  int dx;
-  int dy;
-  unsigned char attribute;
-  short lifetime;
-
-  unsigned char sprite;
-} Particles;
-
-
-typedef struct Actor
-{
-  unsigned char x;
-  unsigned char y;
-  int dx;
-  int dy;
-  unsigned char attribute;
-  unsigned char alive;
-  unsigned char moveSpeed;
-  unsigned char jumpSpeed;
-  char jumpTimer;
-  char grounded;
-} Actor;
-
-typedef struct SpriteActor
-{
-  Actor act;
-  unsigned char sprite;
-} SpriteActor;
-
-typedef struct MetaActor
-{
-  Actor act;
-  unsigned char * metasprite;
-} MetaActor;
-
-
-char PALETTE[32] = 
-{
-  0x03, // screen color
-  0x24, 0x16, 0x20, 0x0,// background palette 0
-  0x1c, 0x20, 0x2c, 0x0,// background palette 1
-  0x00, 0x1a, 0x20, 0x0,// background palette 2
-  0x00, 0x1a, 0x20, 0x0,// background palette 3
-
-  0x3F, 0x3F, 0x22, 0x0,// sprite palette 0
-  0x00, 0x37, 0x25, 0x0,// sprite palette 1
-  0x36, 0x21, 0x19, 0x0,// sprite palette 2
-  0x1d, 0x37, 0x2b,// sprite palette 3
-};
-
-
 
 //functions defined here
 void updateMetaSprite(unsigned char attribute, unsigned char * meta)
@@ -729,26 +511,6 @@ void writeText(char * data, unsigned char addressX, unsigned char addressY)
   {
     vram_write(line, currentIndex-startIndex);
   }
-}
-
-unsigned int getAbs(int n) 
-{ 
-  int const mask = n >> (1); 
-  return ((n + mask) ^ mask); 
-} 
-
-short rectanglesHit(unsigned char x, unsigned char y, unsigned char width, unsigned char height, unsigned char x2, unsigned char y2, unsigned char width2, unsigned char height2)
-{
-  if(!(x ^ x2) && !(y ^ y2))
-    return true;
-  //If one rectangle is on left side of other 
-  if (x > x2+width2 || x2 > x+width) 
-    return false; 
-
-  // If one rectangle is above other 
-  if (y > y2+height2 || y2 < y+height) 
-    return false; 
-  return true; 
 }
 
 void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
@@ -830,7 +592,7 @@ void setNewPlayerPos()
   pal_fade_to(6);
 }
 
-byte old_worldScrolling = false;
+
 void scrollWorld(byte direction, MetaActor* PlayerActor)
 {
   int deltaX = 0, deltaY = 0;
@@ -999,9 +761,6 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
   }
 }
 
-char selectedPosition[3];
-const char playerPlaceBlock = 0xC0;
-
 void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacingRight, int offset, byte findEmpty)
 {
   byte breakBlock = searchPlayer(playerX, playerY + (upOffset*8), 0, lastFacingRight, offset);
@@ -1152,11 +911,7 @@ void setWorldNumber(byte num)
   worldNumber = num;
 }
 
-char groundBlock[6];
-//const byte stausX = 8;
-//const byte stausY = 26;
 
-// main function, run after console reset
 void main(void) {
 
   char cur_oam;
@@ -1172,7 +927,7 @@ void main(void) {
   byte timeBetweenFall = 2;
   byte fallTimer = 0;
 
-  SpriteActor feet;
+  SpriteActor feet; //this is a debug variable
 
   byte doorsDirty = false;
 
@@ -1578,19 +1333,11 @@ void main(void) {
         }
       }
 
+      if(doorsDirty)
       {
         //makes stairs go to next level!
-        //char dx[32];
-
-        //writeBinary(UpTo8DoorsOpen, 2, 2);
-
-        //StairsGoToWorld[i]
         for(i = 0; i < numDoors; i++)
         {
-
-          //sprintf(dx, "door: %d   ", DoorInfo[i]);
-          //updateScreen(2, 3+i, dx, 32);
-
           if(((UpTo8DoorsOpen >> i) & 0x01) == 1)
           {
             //then these stairs are open!
@@ -1598,12 +1345,11 @@ void main(void) {
                && player.act.y/8 >= DoorPositions[i*2 + 1]-1 && player.act.y/8 <= DoorPositions[i*2 + 1]+1)
             {
               jumping = false;
-              //instead go to new world
 
               setWorldNumber(StairsGoToWorld[i]);
               worldScrolling = true;
 
-              ppu_off();
+              ppu_off(); //makes scrolling work!!!!!!
             }
           }
         }
@@ -1634,68 +1380,9 @@ void main(void) {
 
       }
 
-      //jumping debug
-      /*
-      if(debugCheck){
-
-        byte above = true;
-        int deltaY = 0;
-        int deltaX = 0;
-        if(above)
-        {
-          deltaY = -1;
-        }
-        else
-        {
-          deltaY = 2;
-        }
-        if(player.act.x % 8 != 0)
-        {
-          if(lastFacingRight)
-          {
-            deltaX = 1;
-          }
-        }
-        else
-        {
-          if(!lastFacingRight)
-          {
-            deltaX = 1;
-          }
-        }
-        feet.act.x = (player.act.x/8 + deltaX);
-        feet.act.y = (player.act.y/8 + deltaY);
-        cur_oam = oam_spr(feet.act.x * 8, feet.act.y * 8, feet.sprite , 1, cur_oam);
-        feet.act.x += 1;
-        cur_oam = oam_spr(feet.act.x * 8, feet.act.y * 8, feet.sprite , 2, cur_oam);
-
-
-        {
-          byte result = 0;
-          char dx[32];
-          result = checkGround((player.act.x/8) + deltaX, (player.act.y/8) + deltaY, 1);
-          sprintf(dx, "ground_01: %d   ", result);
-          updateScreen(2, 7, dx, 32);
-
-          result = checkGround((player.act.x/8) + deltaX + 1, (player.act.y/8) + deltaY, 1);
-          sprintf(dx, "ground_02: %d   ", result);
-          updateScreen(2, 8, dx, 32);
-
-          result = aboveOrBellowPlayer(player.act.x, player.act.y, 1, above, lastFacingRight, 0);
-
-          sprintf(dx, "above: %d   ", result);
-          updateScreen(2, 6, dx, 32);
-
-        }
-      }
-      */
 
       if(player.act.jumpTimer != MAX_JUMP-1 && !playerInAir)
       {
-
-
-        //if(player.act.grounded == true && ((pad_result & 0x10) >> 4))
-        //noBlocksAbove&0x01
         if(player.act.grounded == true && noBlocksAbove == 0 && jumping)
         {
           //if grounded and you try to jump...
@@ -1725,42 +1412,6 @@ void main(void) {
         fallTimer = fallTimer%timeBetweenFall;
 
       }
-
-
-      //debug
-
-      /*
-        if(debugCheck)
-        {
-          char dx[32];
-          sprintf(dx, "grounded: %d   ", player.act.grounded);
-          updateScreen(2, 6, dx, 32);
-
-          writeBinary(2, 5, pad_result);
-
-
-          //sprintf(dx, "%d", player.act.dx);
-          sprintf(dx, "break block: %d", breakBlock);
-          updateScreen(2, 7, dx, 32);
-
-
-
-          //sprintf(dx, "%d", player.act.dx);
-          sprintf(dx, "air: %d        ", playerInAir);
-          updateScreen(2, 8, dx, 32);
-
-
-
-          //sprintf(dx, "%d", player.act.dx);
-          sprintf(dx, "timer: %d      ", player.act.jumpTimer);
-          updateScreen(2, 9, dx, 32);
-
-        }
-        */
-
-      //byte scrollWorld(byte direction, MetaActor* PlayerActor, byte worldScrolling)
-      //0x01 = left, 0x02 = right, 0x03 = up, 0x04 = down
-      //transition = 0x02;
 
 
       {
@@ -1823,108 +1474,54 @@ void main(void) {
       }
 
 
-      //minning debug
-      /*
-      if(debugCheck)
+      //digging
+
+      cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
+
+      if((pad_result&0x08)>>3)
       {
+        int deltaX = 0;
+        int deltaY = 0;
+        char current = checkGround(selectedPosition[0], selectedPosition[1], 0) | checkGround(selectedPosition[0], selectedPosition[1],1);
 
-        int collision = 0;
-        if(lastFacingRight)
+        if(current != 0)
         {
-          collision = -2;
-        }
-        else
-        {
-          collision = 1;
-        }
-        feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
-        feet.act.y = (player.act.y/8) *8;
-        cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 2, cur_oam);
-
-        feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
-        feet.act.y = ((player.act.y/8) + 1) *8;
-        cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-
-        if(lastFacingRight)
-        {
-          collision = -1;
-        }
-        else
-        {
-          collision = 2;
-        }
-
-        feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
-        feet.act.y = (player.act.y/8) *8;
-        cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-
-        feet.act.x = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision) * 8;
-        feet.act.y = (player.act.y/8 + 1) *8;
-        cur_oam = oam_spr(feet.act.x, feet.act.y, feet.sprite , 1, cur_oam);
-
-      }
-      */
-
-
-      {
-
-        cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
-
-        if((pad_result&0x08)>>3)
-        {
-          int deltaX = 0;
-          int deltaY = 0;
-          char current = checkGround(selectedPosition[0], selectedPosition[1], 0) | checkGround(selectedPosition[0], selectedPosition[1],1);
-
-
-
-          if(current != 0)
+          if(Up_Down == 0x00)
           {
-            if(Up_Down == 0x00)
-            {
-              deltaX = (1-lastFacingRight)*2 -1;
-              current = checkGround(selectedPosition[0] + deltaX, selectedPosition[1], 0) | checkGround(selectedPosition[0] + deltaX, selectedPosition[1],1);
-            }
-            else
-            {
-              if(Up_Down == 0x01)
-              {
-                // up
-                deltaY = -1;
-              }
-              else if(Up_Down == 0x02)
-              {
-                // down
-                deltaY = 1;
-              }
-              current = checkGround(selectedPosition[0], selectedPosition[1]+deltaY, 0) | checkGround(selectedPosition[0], selectedPosition[1]+deltaY,1);
-            }
+            deltaX = (1-lastFacingRight)*2 -1;
+            current = checkGround(selectedPosition[0] + deltaX, selectedPosition[1], 0) | checkGround(selectedPosition[0] + deltaX, selectedPosition[1],1);
           }
-          if(current == 0)
+          else
           {
-            if(digTimer <= 0)
+            if(Up_Down == 0x01)
             {
-              /*
-              ppu_off();
-              //ppu_wait_nmi();
-              setVRAMAddress(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, true);
-              vram_put(playerPlaceBlock);
-              ppu_on_all();
-              */
-              char block[1];
-              block[0] = playerPlaceBlock;
-
-              updateScreen(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, block, 1);
-
-              setGround(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, 0x03);
-
-              digTimer = digWait;
+              // up
+              deltaY = -1;
             }
-            else
+            else if(Up_Down == 0x02)
             {
-              digTimer--;
+              // down
+              deltaY = 1;
             }
+            current = checkGround(selectedPosition[0], selectedPosition[1]+deltaY, 0) | checkGround(selectedPosition[0], selectedPosition[1]+deltaY,1);
+          }
+        }
+        if(current == 0)
+        {
+          if(digTimer <= 0)
+          {
+            char block[1];
+            block[0] = playerPlaceBlock;
 
+            updateScreen(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, block, 1);
+
+            setGround(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, 0x03);
+
+            digTimer = digWait;
+          }
+          else
+          {
+            digTimer--;
           }
         }
       }
