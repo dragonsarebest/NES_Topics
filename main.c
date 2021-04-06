@@ -915,52 +915,49 @@ void setWorldNumber(byte num)
 void main(void) {
 
   char cur_oam;
-  char statusVal = 0xA0;
-
-  unsigned char floorLevel = 20;
-  unsigned char floorTile = 0xc0;
 
   byte lastFacingRight = true;
-  byte playerInAir = true; //since we start off the ground
+  byte playerInAir = true;
   byte run = 0;
   byte swing = 0;
   byte timeBetweenFall = 2;
   byte fallTimer = 0;
+  short digTimer = 0;
+  short digWait = 2;
+  //player variables
 
   SpriteActor feet; //this is a debug variable
 
-  byte doorsDirty = false;
+  byte doorsDirty = false; //if a door is open
 
   Particles singleBricks[NUM_BRICKS];
-  unsigned char numActive = 0;
-
-  short brickSpeed = 5;
-  short brickLifetime = 10;
-  short digTimer = 0;
-  short digWait = 2;
+  unsigned char numActive = 0; //break block particles
+  short brickSpeed = 5; //speed of particles
+  short brickLifetime = 10; //lifetime of particles
 
   unsigned int i = 0, j = 0;
 
-  char debugCheck = false;
+  byte Up_Down = 0; //minning up or down, or straight ahead
+  byte lastTouch = 0; //gives the player leeway - 10 frames to let go of shift, otherwise it will continually register
 
-  byte Up_Down = 0;
-  byte lastTouch = 0;
-
+  
   worldScrolling = false;
   scrollSwap = !worldScrolling;
   old_worldScrolling = worldScrolling;
   worldNumber = 0;
   transition = 0x01;
+  //default world parameters
 
   pal_all(PALETTE);// generally before game loop (in main)
-
+  
   feet.act.x = 0;
   feet.act.y = 0;
   feet.sprite = 0x0F;
 
   player.act.x = 8*1;
   player.act.y = 23* 8;
-
+  //starting player position
+  
   player.act.dx = 0;
   player.act.dy = 0;
   player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
@@ -970,18 +967,12 @@ void main(void) {
   player.act.jumpSpeed = 4;
   player.act.grounded = true;
 
-  if(playerInAir)
-  {
-    player.act.dy = 1;
-  }
-
   randomizeParticle(singleBricks, brickSpeed, 0, 0);
   // enable PPU rendeing (turn on screen)
 
   loadWorld();
 
   updatePlayerSprites();
-  //debugDisplayShadow();
 
   ppu_on_all();
 
