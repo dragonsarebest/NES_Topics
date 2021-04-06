@@ -1510,7 +1510,7 @@ void main(void) {
               setGround(itemX, itemY, 0);
 
               //ppu_wait_nmi();
-              ppu_off();
+              //ppu_off();
 
               //check if it's a door (c4->c7)
               //if it is replace with stair blocks
@@ -1561,12 +1561,21 @@ void main(void) {
                   }
 
                 }
+                
+                {
+                  char block[1];
+                  block[0] = newBlock;
+
+                  updateScreen(itemX, itemY, block, 1);
+                }
+                /*
                 setVRAMAddress(itemX, itemY, true);
 
                 vram_put(newBlock);
+                */
               }
 
-              ppu_on_all();
+              //ppu_on_all();
 
 
               numActive = NUM_BRICKS;
@@ -1907,11 +1916,18 @@ void main(void) {
           {
             if(digTimer <= 0)
             {
+              /*
               ppu_off();
               //ppu_wait_nmi();
               setVRAMAddress(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, true);
               vram_put(playerPlaceBlock);
               ppu_on_all();
+              */
+              char block[1];
+              block[0] = playerPlaceBlock;
+              
+              updateScreen(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, block, 1);
+              
               setGround(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, 0x03);
 
               digTimer = digWait;
