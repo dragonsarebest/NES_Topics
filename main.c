@@ -992,7 +992,6 @@ void scrollWorld(byte direction, MetaActor* PlayerActor)
   }
 }
 
-
 char selectedPosition[3];
 const char playerPlaceBlock = 0xC0;
 
