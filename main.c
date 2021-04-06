@@ -670,7 +670,9 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
   byte breakBlock = searchPlayer(playerX, playerY + (upOffset*8), 0, lastFacingRight, offset);
   int itemX, itemY, collision;
   byte suitableOption = true;
-
+  int deltaX = (lastFacingRight*3 - 1);
+  //deltaX = (lastFacingRight*2 - 1);
+  
   selectedPosition[2] = 1;
 
   if(lastFacingRight)
@@ -684,12 +686,12 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
 
   if((breakBlock & 0x02) != findEmpty)
   {
-    itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
+    itemX = ((playerX/8)+deltaX + collision + offset);
     itemY = playerY/8 + 1;
   }
   else if((breakBlock & 0x01) != findEmpty)
   {
-    itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
+    itemX = ((playerX/8)+deltaX + collision + offset);
     itemY = playerY/8;
   }
   else
@@ -705,12 +707,12 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
 
     if((breakBlock & 0x08) != findEmpty)
     {
-      itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
+      itemX = ((playerX/8)+deltaX + collision + offset);
       itemY = playerY/8 + 1;
     }
     else if((breakBlock & 0x04) != findEmpty)
     {
-      itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset);
+      itemX = ((playerX/8)+deltaX + collision + offset);
       itemY = playerY/8;
     }
     else
@@ -734,7 +736,8 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
       collision = 1;
     }
     //lastFacingRight == true/1 -> 0, lastFacingRight == false/0 -> -1.. lastFacingRight-1 
-    itemX = ((playerX/8)+(lastFacingRight*3 - 1) + collision + offset + (lastFacingRight - 1));
+    
+    itemX = ((playerX/8)+deltaX + collision + offset + (lastFacingRight - 1));
     itemY = playerY/8 + 1 + upOffset;
   }
   selectedPosition[0] = itemX;
@@ -959,8 +962,6 @@ void main(void) {
           }
 
         }
-        //writeBinary(2, 8+i, groundBlock[i]);
-
         res = res | groundBlock[i];
       }
 
@@ -999,7 +1000,6 @@ void main(void) {
           if((pad_result & 0x20))
           {
             noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, false, lastFacingRight, 0);
-            //if(noBlocksAbove != 0)
             {
               //pressing down on keypad
               Up_Down = 0x01;
@@ -1022,8 +1022,6 @@ void main(void) {
         {
           lastTouch--;
         }
-        //writeBinary(2, 5, pad_result);
-        //writeBinary(2, 2, Up_Down);
       }
 
 
@@ -1033,7 +1031,6 @@ void main(void) {
           if(singleBricks[i].lifetime > 0)
           {
             cur_oam = oam_spr(singleBricks[i].x, singleBricks[i].y, singleBricks[i].sprite ,singleBricks[i].attribute, cur_oam);
-            //if(walk_wait == 0)
             {
               singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx;
               singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy;
@@ -1079,7 +1076,7 @@ void main(void) {
           upOffset = 0;
         }
         setSelectedPosition(player.act.x, player.act.y, upOffset, lastFacingRight, offset, 0);
-
+        
         if(swing == 0)
         {
 
@@ -1089,7 +1086,7 @@ void main(void) {
           {
             swing = 1;
           }
-          if((breakBlock != 0) && breaking)
+          if((breakBlock != 0) && breaking || selectedPosition[2] != 0 && breaking)
           {
 
             int itemX, itemY, collision;
@@ -1147,13 +1144,8 @@ void main(void) {
             {
               itemY += upOffset;
 
-              outsideHelper = upOffset;
-
               setGround(itemX, itemY, 0);
-
-              //ppu_wait_nmi();
-              //ppu_off();
-
+              
               //check if it's a door (c4->c7)
               //if it is replace with stair blocks
               //else put background block in
@@ -1182,10 +1174,7 @@ void main(void) {
                     x--;
                     y--;
                   }
-
-                  //outsideHelper2 = x;
-                  //outsideHelper3 = y;
-
+                  
                   for(i = 0; i < numDoors; i++)
                   {
                     if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
@@ -1375,7 +1364,7 @@ void main(void) {
 
 
       //digging
-
+      
       cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
 
       if((pad_result&0x08)>>3)
