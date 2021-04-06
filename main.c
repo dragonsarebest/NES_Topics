@@ -1,10 +1,3 @@
-/*
-  game idea:
-  you're storming a castle and can break blocks and other objects -> they explode into chunks
-  I will need to sprinkle in some larger chunks too.....
-  */
-
-
 #define NES_MIRRORING 1 //(1 = "vertical", 0 = "horizontal")
 //Nametable A starts at 0x2000, Nametable B starts at 0x2400
 
@@ -43,12 +36,20 @@
 
 #define BYTE_PER_COL 32
 
+const int note_table[64] = {
+  2152,4063,3835,3620,3417,3225,3044,2873,
+  2712,2560,2416,2280,2152,2032,1918,1810,
+  1708,1612,1522,1437,1356,1280,1208,1140,
+  1076,1016,959,905,854,806,761,718,
+  678,640,604,570,538,508,479,452,
+  427,403,380,359,339,320,302,285,
+  269,254,240,226,214,202,190,180,
+  169,160,151,143,135,127,120,113,
+};
+
 int outsideHelper; //used for debugging
 int outsideHelper2;
 int outsideHelper3;
-int outsideHelper4;
-int outsideHelper5;
-int outsideHelper6;
 
 #define SHADOW_SIZE (NUM_SHADOW_ROW * NUM_SHADOW_COL)/4
 char shadow[SHADOW_SIZE];
@@ -59,7 +60,7 @@ char DoorInfo[8];
 char StairsGoToWorld[8];
 char DoorPositions[16];
 byte numDoors;
-byte old_worldNumber;
+
 //each bit represents one door, ordered left to right up down.
 
 #define MAX_JUMP 7
@@ -73,9 +74,31 @@ int jumpTable[MAX_JUMP] =
 #define NumWorlds 2
 #define LargestWorld NUM_SHADOW_ROW * NUM_SHADOW_COL
 char worldNumber;
+byte old_worldNumber;
 char transition;
 byte scrollSwap;
 byte worldScrolling;
+
+byte brightness = 4;
+
+byte numBombs = 0;
+byte numBlocks = 0;
+byte numLives = 1;
+#define pastHereBeBlocks 0x70
+
+int world_x = 0;
+int world_y = 0;
+
+DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
+MetaActor player;
+
+DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_1, 0xE0, 0);
+DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_2, 0xE4, 0);
+
+DEF_METASPRITE_2x2(PlayerMetaSprite_Jump, 0xE8, 0);
+
+DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xDC, 0);
+
 
 //960 is the largest map size...
 const char worldData[NumWorlds][LargestWorld] = {
@@ -129,11 +152,7 @@ const char worldData[NumWorlds][LargestWorld] = {
     }
 };
 
-byte brightness = 4;
 
-byte numBombs = 0;
-byte numBlocks = 0;
-byte numLives = 1;
 
 
 
@@ -442,7 +461,7 @@ void debugDisplayShadow()
   ppu_on_all();
 }
 
-#define pastHereBeBlocks 0x70
+
 
 byte loadWorld()
 { 
@@ -526,7 +545,7 @@ byte loadWorld()
         {
           shadowBits = 0x01; // just breakable
         }
-        
+
         if(y <= 5)
         {
           shadowBits = 0;
@@ -620,18 +639,6 @@ typedef struct MetaActor
   unsigned char * metasprite;
 } MetaActor;
 
-int world_x = 0;
-int world_y = 0;
-
-DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
-MetaActor player;
-
-DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_1, 0xE0, 0);
-DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_2, 0xE4, 0);
-
-DEF_METASPRITE_2x2(PlayerMetaSprite_Jump, 0xE8, 0);
-
-DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xDC, 0);
 
 char PALETTE[32] = 
 {
@@ -1075,9 +1082,9 @@ void updatePlayerHealth(int health, MetaActor * player)
 {
   int i;
   char hearts[10];
-  
+
   health = player->act.alive - health;
-  
+
   if(health <= 0)
   {
     player->act.alive = 0;
@@ -1086,7 +1093,7 @@ void updatePlayerHealth(int health, MetaActor * player)
   {
     player->act.alive = health;
   }
-  
+
   for(i = 1; i < 11; i++)
   {
     if(i <= player->act.alive)
@@ -1102,7 +1109,7 @@ void updatePlayerHealth(int health, MetaActor * player)
       hearts[i-1] = 0x16;
     }
   }
-  
+
   updateScreen(5, 2, hearts, 10);
 }
 
@@ -1110,7 +1117,7 @@ void updatePlayerHealth(int health, MetaActor * player)
 void updateBombBlockLives(int amount, byte whichOne)
 {
   char number[14];
-  
+
   if(whichOne == 0x01)
   {
     numBombs += amount;
@@ -1129,7 +1136,7 @@ void updateBombBlockLives(int amount, byte whichOne)
     if(numLives > 99)
       numLives = 99;
   }
-  
+
   sprintf(number, "-x%d%d -x%d%d -x%d%d", (numBombs/10)%10, numBombs%10, 
           (numBlocks/10)%10, numBlocks%10, (numLives/10)%10, numLives%10);
   number[0] = 0x19;
@@ -1220,7 +1227,7 @@ void main(void) {
 
   updatePlayerSprites();
   //debugDisplayShadow();
-  
+
   ppu_on_all();
 
   //always updates @ 60fps
@@ -1237,7 +1244,7 @@ void main(void) {
     //oam_clear();
     //cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
     cur_oam = 4;
-    
+
 
     player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6) ;
     res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, 0);
@@ -1264,7 +1271,7 @@ void main(void) {
         player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
         updatePlayerSprites();
       }
-      
+
       if((res & 0x0C) != 0 && player.act.dx > 0)
       {
         //player.act.dx = -1;
@@ -1541,7 +1548,7 @@ void main(void) {
                   }
 
                 }
-                
+
                 {
                   char block[1];
                   block[0] = newBlock;
@@ -1906,9 +1913,9 @@ void main(void) {
               */
               char block[1];
               block[0] = playerPlaceBlock;
-              
+
               updateScreen(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, block, 1);
-              
+
               setGround(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, 0x03);
 
               digTimer = digWait;
