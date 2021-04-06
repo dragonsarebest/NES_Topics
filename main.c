@@ -827,7 +827,7 @@ void main(void) {
   byte timeBetweenFall = 2;
   byte fallTimer = 0;
   short digTimer = 0;
-  short digWait = 2;
+  short digWait = 5;
   //player variables
 
   SpriteActor feet; //this is a debug variable
@@ -931,6 +931,7 @@ void main(void) {
       {
         //player.act.dx = 1;
         player.act.dx = 0;
+        player.act.x -= (player.act.x % 8) > 0;
       }
 
       res = 0;
@@ -1058,6 +1059,11 @@ void main(void) {
       {
         byte offset = 1;
         int upOffset = 0;
+        
+        if(lastFacingRight == false)
+        {
+          offset = 0; //fixes bug where you couldnt break blocks on your left if you were touching them
+        }
         if(Up_Down == 0x01)
         {
           // up
