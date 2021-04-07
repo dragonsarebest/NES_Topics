@@ -849,13 +849,16 @@ void main(void) {
   char cur_oam;
 
   //byte lastFacingRight = true;
-  byte playerInAir = true;
+  //byte playerInAir = true;
   byte run = 0;
   byte swing = 0;
+  
   byte timeBetweenFall = 2;
   byte fallTimer = 0;
   short digTimer = 0;
   short digWait = 5;
+  byte Up_Down = 0; //minning up or down, or straight ahead
+  byte lastTouch = 0; //gives the player leeway - 10 frames to let go of shift, otherwise it will continually register
   //player variables
 
   SpriteActor feet; //this is a debug variable
@@ -867,10 +870,6 @@ void main(void) {
   short brickLifetime = 10; //lifetime of particles
 
   unsigned int i = 0, j = 0;
-
-  byte Up_Down = 0; //minning up or down, or straight ahead
-  byte lastTouch = 0; //gives the player leeway - 10 frames to let go of shift, otherwise it will continually register
-
 
   worldScrolling = false;
   scrollSwap = !worldScrolling;
@@ -897,8 +896,8 @@ void main(void) {
   player.act.moveSpeed = 1;
   player.act.jumpSpeed = 4;
   player.act.grounded = true;
-  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking
-  player.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04;
+  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER
+  player.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04 | 0x05;
 
   boss.act.alive = 0;
   boss.act.moveSpeed = 2;
@@ -907,7 +906,8 @@ void main(void) {
   boss.act.dx = 0;
   boss.act.dy = 0;
   boss.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
-
+  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER
+  boss.boolean = 0x01 | 0*0x02 | 0*0x03 | 0*0x04 | 0*0x05;
 
 
   randomizeParticle(singleBricks, brickSpeed, 0, 0);
@@ -931,8 +931,9 @@ void main(void) {
     char breakBlock;
     char pad_result= pad_poll(0) | pad_poll(1);
     
-    byte lastFacingRight = (player.boolean & 0x01);
-
+    byte lastFacingRight = (player.boolean & 0x02) >> 1;
+    byte playerInAir = (player.boolean & 0x01);
+    
     //oam_clear();
     //cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
     cur_oam = 4;
@@ -976,15 +977,15 @@ void main(void) {
 
       if((pad_result & 0x80)>>7 && lastFacingRight == false)
       {
-        player.boolean |= 0x01;
-        lastFacingRight = (player.boolean & 0x01);
+        player.boolean |= 0x02;
+        lastFacingRight = (player.boolean & 0x02) >> 1;
       }
       else
       {
         if((pad_result & 0x40)>>6 && lastFacingRight)
         {
-          player.boolean = player.boolean & 0xFE; //1111 1110
-          lastFacingRight = (player.boolean & 0x01);
+          player.boolean = player.boolean & 0xFD; //1111 1101
+          lastFacingRight = (player.boolean & 0x02) >> 1;
         }
       }
 
@@ -1043,7 +1044,8 @@ void main(void) {
         {
           //start falling! we walk off a block and dont jump
           player.act.jumpTimer = MAX_JUMP/2;
-          playerInAir = true;
+          player.boolean |= 0x01;
+          playerInAir = player.boolean&0x01;
           fallTimer = 0;
         }
       }
@@ -1353,7 +1355,8 @@ void main(void) {
           if(returnVal == 0x03)
           {
             player.act.dy = 0;
-            playerInAir = false;
+            player.boolean = player.boolean & 0xFE;
+            playerInAir = player.boolean&0x01;
             player.act.jumpTimer = 0;
             player.act.grounded = true;
           }
@@ -1425,7 +1428,8 @@ void main(void) {
 
         player.act.dy = 0;
 
-        playerInAir = false;
+        player.boolean = player.boolean & 0xFE;
+        playerInAir = player.boolean&0x01;
         //player.act.grounded = false;
         player.act.jumpTimer = 0;
 
@@ -1440,7 +1444,8 @@ void main(void) {
           player.act.jumpTimer = 0;
           player.act.dy = jumpTable[player.act.jumpTimer];
           player.act.jumpTimer++;
-          playerInAir = true;
+          player.boolean |= 0x01;
+          playerInAir = player.boolean&0x01;
           fallTimer = 0;
         }
 
