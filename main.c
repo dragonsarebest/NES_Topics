@@ -962,10 +962,10 @@ void main(void) {
           lastFacingRight = false;
         }
       }
-      {
-        player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
-        updatePlayerSprites();
-      }
+      
+      player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
+      updatePlayerSprites();
+      
 
       if((res & 0x0C) != 0 && player.act.dx > 0)
       {
@@ -1271,12 +1271,15 @@ void main(void) {
       if(boss.act.alive > 0)
       {
         unsigned char * currentMeta;
-        
         if(bossNumber == 0)
         {
           currentMeta = ChainChomp_stand;
         }
         //update & draw boss...
+        
+        //true = right = 1, false = left = 0
+        boss.act.attribute = (boss.act.attribute & 0xBF) | (!(boss.act.dx > 0)  << 6);
+        updateBossMetaSprites();
         cur_oam = oam_meta_spr(boss.act.x, boss.act.y, cur_oam, currentMeta);
       }
       
