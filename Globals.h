@@ -74,6 +74,11 @@ DEF_METASPRITE_2x2(PlayerMetaSprite_Jump, 0xE8, 0);
 
 DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xDC, 0);
 
+DEF_METASPRITE_2x2(ChainChomp_stand, 0xF8, 0);
+MetaActor boss;
+byte bossSpawnedTracker = 0;
+byte spawnBoss = false;
+byte bossNumber = 0;
 
 //960 is the largest map size...
 const char worldData[NumWorlds][LargestWorld] = {

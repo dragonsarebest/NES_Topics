@@ -816,7 +816,18 @@ void setWorldNumber(byte num)
 {
   old_worldNumber = worldNumber;
   worldNumber = num;
+  
+  spawnBoss = true;
 }
+
+void updateBossMetaSprites()
+{
+  if(bossNumber == 0)
+  {
+    updateMetaSprite(boss.act.attribute, ChainChomp_stand);
+  }
+}
+
 
 
 void main(void) {
@@ -873,6 +884,17 @@ void main(void) {
   player.act.moveSpeed = 1;
   player.act.jumpSpeed = 4;
   player.act.grounded = true;
+  
+  
+  boss.act.alive = 0;
+  boss.act.moveSpeed = 2;
+  boss.act.jumpSpeed = 4;
+  boss.act.grounded = true;
+  boss.act.dx = 0;
+  boss.act.dy = 0;
+  boss.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
+  
+  
 
   randomizeParticle(singleBricks, brickSpeed, 0, 0);
   // enable PPU rendeing (turn on screen)
@@ -889,6 +911,7 @@ void main(void) {
     int noBlocksAbove;
     byte jumping;
     byte breaking;
+    byte change;
 
     int res = 0;
     char breakBlock;
@@ -909,6 +932,25 @@ void main(void) {
     }
     else
     {
+      
+      if(spawnBoss)
+      {
+        spawnBoss = false;
+        //get spawn location & which boss here
+        if(worldNumber == 1 && (bossSpawnedTracker & 0x01) == 0)
+        {
+          bossSpawnedTracker |= 0x01; //only spawn boss once!
+          bossNumber = 0;
+          boss.act.attribute = 1;
+          boss.act.x = 28*8;
+          boss.act.y =  25*8;
+          boss.act.alive = 20;
+          boss.act.moveSpeed = 2;
+          boss.act.jumpSpeed = 4;
+          //seettings for world 1 boss
+        }
+      }
+      
       if((pad_result & 0x80)>>7 && lastFacingRight == false)
       {
         lastFacingRight = true;
@@ -1146,6 +1188,9 @@ void main(void) {
 
               setGround(itemX, itemY, 0);
               
+              //updateBombBlockLives(1, 0x02);
+              change |= 0x02;
+              
               //check if it's a door (c4->c7)
               //if it is replace with stair blocks
               //else put background block in
@@ -1153,7 +1198,7 @@ void main(void) {
                 char newBlock = 0x0D;
                 char oldBlock = getchar_vram(itemX, itemY);
 
-                outsideHelper = oldBlock;
+                //outsideHelper = oldBlock;
 
                 if(oldBlock >= 0xC4 && oldBlock <= 0xC7)
                 {
@@ -1221,6 +1266,21 @@ void main(void) {
           }
         }
       }
+      
+      
+      if(boss.act.alive > 0)
+      {
+        unsigned char * currentMeta;
+        
+        if(bossNumber == 0)
+        {
+          currentMeta = ChainChomp_stand;
+        }
+        //update & draw boss...
+        cur_oam = oam_meta_spr(boss.act.x, boss.act.y, cur_oam, currentMeta);
+      }
+      
+      
 
       if(doorsDirty)
       {
@@ -1306,6 +1366,7 @@ void main(void) {
       {
         //animate the player!
         byte shoudlRun = true;
+        
         if(swing != 0)
         {
           shoudlRun = false;
@@ -1363,11 +1424,11 @@ void main(void) {
       }
 
 
-      //digging
+      //placing
       
       cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
 
-      if((pad_result&0x08)>>3)
+      if((pad_result&0x08)>>3 && numBlocks > 0)
       {
         int deltaX = 0;
         int deltaY = 0;
@@ -1401,6 +1462,8 @@ void main(void) {
           {
             char block[1];
             block[0] = playerPlaceBlock;
+            
+            change |= 0x01;
 
             updateScreen(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, block, 1);
 
@@ -1419,6 +1482,13 @@ void main(void) {
     scrollWorld(transition, &player);
 
     oam_hide_rest(cur_oam);
+    
+    if((change&0x03) != 0)
+    {
+      updateBombBlockLives(((change&0x02) >> 1) - (change&0x01), 0x02);
+      change = change & (0xFF ^ 0x03);
+    }
+    
     //this makes it wait one frame in between updates
     /*
     updatePlayerHealth(1, &player);
