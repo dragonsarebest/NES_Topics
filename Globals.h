@@ -80,6 +80,10 @@ byte bossSpawnedTracker = 0;
 byte spawnBoss = false;
 byte bossNumber = 0;
 
+//how long to flash
+byte hurtPlayer = 0;
+byte hurtBoss = 0;
+
 //960 is the largest map size...
 const char worldData[NumWorlds][LargestWorld] = {
   {

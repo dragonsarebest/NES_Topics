@@ -35,5 +35,11 @@ typedef struct MetaActor
 {
   Actor act;
   unsigned char * metasprite;
+  byte boolean; // 1111 1111, 0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking
 } MetaActor;
 
+
+void updateMetaActor(MetaActor * actor)
+{
+  byte lastFacingRight = actor->boolean & 0x01;
+}

@@ -829,12 +829,26 @@ void updateBossMetaSprites()
 }
 
 
+int metaSpriteCollision(MetaActor * actor1, MetaActor * actor2, byte amountX, byte amountY)
+{
+  int diffX = (actor1->act.x - actor2->act.x);
+  int diffY = (actor1->act.y - actor2->act.y);
+  int maskY = diffY >> 7;
+  int maskX = diffX >> 7;
+  maskX += diffX;
+  maskX = (maskX + diffX) ^ maskX;
+  maskY += diffY;
+  maskY = (maskY + diffY) ^ maskY;
+
+  return((maskX <= amountX) * 0x02) | (maskY <= amountY);
+}
+
 
 void main(void) {
 
   char cur_oam;
 
-  byte lastFacingRight = true;
+  //byte lastFacingRight = true;
   byte playerInAir = true;
   byte run = 0;
   byte swing = 0;
@@ -846,7 +860,6 @@ void main(void) {
 
   SpriteActor feet; //this is a debug variable
 
-  byte doorsDirty = false; //if a door is open
 
   Particles singleBricks[NUM_BRICKS];
   unsigned char numActive = 0; //break block particles
@@ -884,7 +897,8 @@ void main(void) {
   player.act.moveSpeed = 1;
   player.act.jumpSpeed = 4;
   player.act.grounded = true;
-
+  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking
+  player.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04;
 
   boss.act.alive = 0;
   boss.act.moveSpeed = 2;
@@ -916,6 +930,8 @@ void main(void) {
     int res = 0;
     char breakBlock;
     char pad_result= pad_poll(0) | pad_poll(1);
+    
+    byte lastFacingRight = (player.boolean & 0x01);
 
     //oam_clear();
     //cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
@@ -935,13 +951,13 @@ void main(void) {
 
       if(spawnBoss)
       {
-	//always first thing to run once a new world is loaded
-        
+        //always first thing to run once a new world is loaded
+
         updatePlayerHealth(0, &player);
         updateBombBlockLives(0, 0x01);
         updateBombBlockLives(0, 0x02);
         updateBombBlockLives(0, 0x03);
-        
+
         spawnBoss = false;
         //get spawn location & which boss here
         if(worldNumber == 1 && (bossSpawnedTracker & 0x01) == 0)
@@ -960,13 +976,15 @@ void main(void) {
 
       if((pad_result & 0x80)>>7 && lastFacingRight == false)
       {
-        lastFacingRight = true;
+        player.boolean |= 0x01;
+        lastFacingRight = (player.boolean & 0x01);
       }
       else
       {
         if((pad_result & 0x40)>>6 && lastFacingRight)
         {
-          lastFacingRight = false;
+          player.boolean = player.boolean & 0xFE; //1111 1110
+          lastFacingRight = (player.boolean & 0x01);
         }
       }
 
@@ -1101,7 +1119,7 @@ void main(void) {
 
 
 
-      if(!worldScrolling)
+      if(hurtPlayer == 0)
       {
         byte offset = 1;
         int upOffset = 0;
@@ -1128,6 +1146,7 @@ void main(void) {
 
         if(swing == 0)
         {
+          char newBlock = 0x0D;
 
           breakBlock = searchPlayer(player.act.x, player.act.y + (upOffset*8), 0, lastFacingRight, offset);
           //1101
@@ -1141,7 +1160,7 @@ void main(void) {
             int itemX, itemY, collision;
             byte suitableOption = true;
             //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
-            outsideHelper = breakBlock;
+            //outsideHelper = breakBlock;
 
             if(lastFacingRight)
             {
@@ -1192,18 +1211,16 @@ void main(void) {
             if(suitableOption)
             {
               itemY += upOffset;
-
-              setGround(itemX, itemY, 0);
-
               //updateBombBlockLives(1, 0x02);
-              change |= 0x02;
 
               //check if it's a door (c4->c7)
               //if it is replace with stair blocks
               //else put background block in
+
               {
-                char newBlock = 0x0D;
-                char oldBlock = getchar_vram(itemX, itemY);
+                char oldBlock;
+                ppu_wait_nmi();
+                oldBlock = getchar_vram(itemX, itemY);
 
                 //outsideHelper = oldBlock;
 
@@ -1212,6 +1229,7 @@ void main(void) {
                   int x = itemX, y = itemY, i;
                   //0xFc -> 0xFF
                   newBlock = 0xFc + (oldBlock -  0xC4);
+
 
                   if(oldBlock == 0xC5)
                   {
@@ -1235,7 +1253,6 @@ void main(void) {
                       if(DoorInfo[i] == 0)
                       {
                         UpTo8DoorsOpen = UpTo8DoorsOpen | 1 << i;
-                        doorsDirty = true;
                         //stairwellAccessable!
 
                       }
@@ -1245,28 +1262,28 @@ void main(void) {
 
                 }
 
-                {
-                  char block[1];
-                  block[0] = newBlock;
 
-                  updateScreen(itemX, itemY, block, 1);
-                }
-                /*
-                setVRAMAddress(itemX, itemY, true);
-
-                vram_put(newBlock);
-                */
               }
 
-              //ppu_on_all();
-
-
-              numActive = NUM_BRICKS;
-              for(i = 0; i < numActive; i++)
               {
-                singleBricks[i].lifetime = brickLifetime;
-                singleBricks[i].x = itemX*8-5;
-                singleBricks[i].y = itemY*8;
+                char block[1];
+                block[0] = newBlock;
+
+                setGround(itemX, itemY, 0);
+
+                updateScreen(itemX, itemY, block, 1);
+
+                change |= 0x02;
+
+                numActive = NUM_BRICKS;
+
+                for(i = 0; i < numActive; i++)
+                {
+                  singleBricks[i].lifetime = brickLifetime;
+                  singleBricks[i].x = itemX*8-5;
+                  singleBricks[i].y = itemY*8;
+
+                }
 
               }
             }
@@ -1281,6 +1298,12 @@ void main(void) {
         if(bossNumber == 0)
         {
           currentMeta = ChainChomp_stand;
+          
+          if(hurtBoss == 0)
+          {
+            //boss logic
+          }
+          
         }
         //update & draw boss...
 
@@ -1289,10 +1312,7 @@ void main(void) {
         updateBossMetaSprites();
         cur_oam = oam_meta_spr(boss.act.x, boss.act.y, cur_oam, currentMeta);
       }
-
-
-
-      if(doorsDirty)
+      else
       {
         //makes stairs go to next level!
         for(i = 0; i < numDoors; i++)
@@ -1311,6 +1331,78 @@ void main(void) {
               ppu_off(); //makes scrolling work!!!!!!
             }
           }
+        }
+      }
+
+      //dont let boss & player collide
+      if(hurtBoss == 0)
+      {
+        int returnVal = -1;
+        //returnVal = metaSpriteCollision(&player, &boss, 24, 24);
+        returnVal = metaSpriteCollision(&player, &boss, 30, 24);
+        if(returnVal >= 0x03  && boss.act.alive)
+        {
+          
+          
+          if(player.act.dx > 0 && boss.act.x > player.act.x || player.act.dx < 0 && boss.act.x < player.act.x)
+          {
+            player.act.dx = 0;
+          }
+          
+          //if(player.act.dy > 0 && boss.act.y > player.act.y || player.act.dy < 0 && boss.act.y < player.act.y)
+          if(returnVal == 0x03)
+          {
+            player.act.dy = 0;
+            playerInAir = false;
+            player.act.jumpTimer = 0;
+            player.act.grounded = true;
+          }
+          
+          //if(bossNumber == 0)
+          {
+            //only hurts player when theyre facing eachother
+            //if(hurtPlayer == 0 && ( (boss.act.attribute & 0x40) != (player.act.attribute & 0x40) ))
+            
+            if(hurtPlayer == 0 && ( ((boss.act.attribute & 0x40) && player.act.x <= boss.act.x ) || (!(boss.act.attribute & 0x40) && player.act.x >= boss.act.x )))
+            {
+              hurtPlayer += 10;
+              
+              change |= 0x30;
+              
+              player.act.dy = -5;
+              
+              if(boss.act.x > player.act.x)
+              {
+                player.act.dx = -10;
+              }
+              else
+              {
+                player.act.dx = 10;
+              }
+            }
+            
+            if(breaking)
+            {
+              //only hurt boss when swinging sword
+              hurtBoss += 10;
+              
+              //player only does one "hit" at a time
+              boss.act.alive -=1;
+              
+              boss.act.dy = -3;
+              
+              if(boss.act.x < player.act.x)
+              {
+                boss.act.dx = -10;
+              }
+              else
+              {
+                boss.act.dx = 10;
+              }
+            }
+            
+          }
+          
         }
       }
 
@@ -1342,7 +1434,7 @@ void main(void) {
 
       if(player.act.jumpTimer != MAX_JUMP-1 && !playerInAir)
       {
-        if(player.act.grounded == true && noBlocksAbove == 0 && jumping)
+        if(player.act.grounded == true && noBlocksAbove == 0 && jumping && hurtPlayer == 0)
         {
           //if grounded and you try to jump...
           player.act.jumpTimer = 0;
@@ -1438,7 +1530,7 @@ void main(void) {
 
       cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
 
-      if((pad_result&0x08)>>3 && numBlocks > 0)
+      if((pad_result&0x08)>>3 && numBlocks > 0 && hurtPlayer == 0)
       {
         int deltaX = 0;
         int deltaY = 0;
@@ -1489,6 +1581,31 @@ void main(void) {
       }
 
     }
+
+    
+    //make them flash when hurt
+    if(hurtPlayer != 0)
+    {
+      hurtPlayer--;
+      if(hurtPlayer%2)
+        player.act.attribute = !(player.act.attribute & 0x03) | player.act.attribute & 0xFC;
+    }
+    else
+    {
+      player.act.attribute = !(0 & 0x03) | player.act.attribute & 0xFC;
+    }
+    
+    if(hurtBoss != 0)
+    {
+      hurtBoss--;
+      if(hurtBoss%2)
+        boss.act.attribute = !(boss.act.attribute & 0x03) | boss.act.attribute & 0xFC;
+    }
+    else
+    {
+      boss.act.attribute = !(0 & 0x03) | boss.act.attribute & 0xFC;
+    }
+
     scrollWorld(transition, &player);
 
     oam_hide_rest(cur_oam);
@@ -1497,6 +1614,12 @@ void main(void) {
     {
       updateBombBlockLives(((change&0x02) >> 1) - (change&0x01), 0x02);
       change = change & (0xFF ^ 0x03);
+    }
+    
+    if((change & 0x30) != 0)
+    {
+      updatePlayerHealth(1, &player);
+      change = change & (0xFF ^ 0x30);
     }
 
     //this makes it wait one frame in between updates
