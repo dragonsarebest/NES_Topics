@@ -672,7 +672,7 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
   byte suitableOption = true;
   int deltaX = (lastFacingRight*3 - 1);
   //deltaX = (lastFacingRight*2 - 1);
-  
+
   selectedPosition[2] = 1;
 
   if(lastFacingRight)
@@ -736,7 +736,7 @@ void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacing
       collision = 1;
     }
     //lastFacingRight == true/1 -> 0, lastFacingRight == false/0 -> -1.. lastFacingRight-1 
-    
+
     itemX = ((playerX/8)+deltaX + collision + offset + (lastFacingRight - 1));
     itemY = playerY/8 + 1 + upOffset;
   }
@@ -816,7 +816,7 @@ void setWorldNumber(byte num)
 {
   old_worldNumber = worldNumber;
   worldNumber = num;
-  
+
   spawnBoss = true;
 }
 
@@ -858,7 +858,7 @@ void main(void) {
   byte Up_Down = 0; //minning up or down, or straight ahead
   byte lastTouch = 0; //gives the player leeway - 10 frames to let go of shift, otherwise it will continually register
 
-  
+
   worldScrolling = false;
   scrollSwap = !worldScrolling;
   old_worldScrolling = worldScrolling;
@@ -867,7 +867,7 @@ void main(void) {
   //default world parameters
 
   pal_all(PALETTE);// generally before game loop (in main)
-  
+
   feet.act.x = 0;
   feet.act.y = 0;
   feet.sprite = 0x0F;
@@ -875,7 +875,7 @@ void main(void) {
   player.act.x = 8*1;
   player.act.y = 23* 8;
   //starting player position
-  
+
   player.act.dx = 0;
   player.act.dy = 0;
   player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
@@ -884,8 +884,8 @@ void main(void) {
   player.act.moveSpeed = 1;
   player.act.jumpSpeed = 4;
   player.act.grounded = true;
-  
-  
+
+
   boss.act.alive = 0;
   boss.act.moveSpeed = 2;
   boss.act.jumpSpeed = 4;
@@ -893,8 +893,8 @@ void main(void) {
   boss.act.dx = 0;
   boss.act.dy = 0;
   boss.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
-  
-  
+
+
 
   randomizeParticle(singleBricks, brickSpeed, 0, 0);
   // enable PPU rendeing (turn on screen)
@@ -932,9 +932,16 @@ void main(void) {
     }
     else
     {
-      
+
       if(spawnBoss)
       {
+	//always first thing to run once a new world is loaded
+        
+        updatePlayerHealth(0, &player);
+        updateBombBlockLives(0, 0x01);
+        updateBombBlockLives(0, 0x02);
+        updateBombBlockLives(0, 0x03);
+        
         spawnBoss = false;
         //get spawn location & which boss here
         if(worldNumber == 1 && (bossSpawnedTracker & 0x01) == 0)
@@ -950,7 +957,7 @@ void main(void) {
           //seettings for world 1 boss
         }
       }
-      
+
       if((pad_result & 0x80)>>7 && lastFacingRight == false)
       {
         lastFacingRight = true;
@@ -962,10 +969,10 @@ void main(void) {
           lastFacingRight = false;
         }
       }
-      
+
       player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
       updatePlayerSprites();
-      
+
 
       if((res & 0x0C) != 0 && player.act.dx > 0)
       {
@@ -1098,7 +1105,7 @@ void main(void) {
       {
         byte offset = 1;
         int upOffset = 0;
-        
+
         if(lastFacingRight == false)
         {
           offset = 0; //fixes bug where you couldnt break blocks on your left if you were touching them
@@ -1118,7 +1125,7 @@ void main(void) {
           upOffset = 0;
         }
         setSelectedPosition(player.act.x, player.act.y, upOffset, lastFacingRight, offset, 0);
-        
+
         if(swing == 0)
         {
 
@@ -1187,10 +1194,10 @@ void main(void) {
               itemY += upOffset;
 
               setGround(itemX, itemY, 0);
-              
+
               //updateBombBlockLives(1, 0x02);
               change |= 0x02;
-              
+
               //check if it's a door (c4->c7)
               //if it is replace with stair blocks
               //else put background block in
@@ -1219,7 +1226,7 @@ void main(void) {
                     x--;
                     y--;
                   }
-                  
+
                   for(i = 0; i < numDoors; i++)
                   {
                     if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
@@ -1266,8 +1273,8 @@ void main(void) {
           }
         }
       }
-      
-      
+
+
       if(boss.act.alive > 0)
       {
         unsigned char * currentMeta;
@@ -1276,14 +1283,14 @@ void main(void) {
           currentMeta = ChainChomp_stand;
         }
         //update & draw boss...
-        
+
         //true = right = 1, false = left = 0
         boss.act.attribute = (boss.act.attribute & 0xBF) | (!(boss.act.dx > 0)  << 6);
         updateBossMetaSprites();
         cur_oam = oam_meta_spr(boss.act.x, boss.act.y, cur_oam, currentMeta);
       }
-      
-      
+
+
 
       if(doorsDirty)
       {
@@ -1369,7 +1376,7 @@ void main(void) {
       {
         //animate the player!
         byte shoudlRun = true;
-        
+
         if(swing != 0)
         {
           shoudlRun = false;
@@ -1428,7 +1435,7 @@ void main(void) {
 
 
       //placing
-      
+
       cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
 
       if((pad_result&0x08)>>3 && numBlocks > 0)
@@ -1465,7 +1472,7 @@ void main(void) {
           {
             char block[1];
             block[0] = playerPlaceBlock;
-            
+
             change |= 0x01;
 
             updateScreen(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, block, 1);
@@ -1485,13 +1492,13 @@ void main(void) {
     scrollWorld(transition, &player);
 
     oam_hide_rest(cur_oam);
-    
+
     if((change&0x03) != 0)
     {
       updateBombBlockLives(((change&0x02) >> 1) - (change&0x01), 0x02);
       change = change & (0xFF ^ 0x03);
     }
-    
+
     //this makes it wait one frame in between updates
     /*
     updatePlayerHealth(1, &player);
