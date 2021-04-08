@@ -64,25 +64,45 @@ char selectedPosition[3];
 const char playerPlaceBlock = 0xC0;
 char groundBlock[6];
 
-DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
-MetaActor player;
+//5 metasprites per entity....
+#define NUM_ANIMATIONS 5
+#define NUM_DIFF_METAACTORS 2
+#define numOfMetaSprites NUM_ANIMATIONS*NUM_DIFF_METAACTORS
+char * MetaTable[numOfMetaSprites];
 
+DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
 DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_1, 0xE0, 0);
 DEF_METASPRITE_2x2(PlayerMetaSprite_Attack_2, 0xE4, 0);
-
 DEF_METASPRITE_2x2(PlayerMetaSprite_Jump, 0xE8, 0);
-
 DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xDC, 0);
 
 DEF_METASPRITE_2x2(ChainChomp_stand, 0xF8, 0);
+
+MetaActor player;
 MetaActor boss;
+
 byte bossSpawnedTracker = 0;
 byte spawnBoss = false;
 byte bossNumber = 0;
+//byte BossAttacking = false;
 
-//how long to flash
-byte hurtPlayer = 0;
-byte hurtBoss = 0;
+//
+byte Up_Down = 0; //minning up or down, or straight ahead
+byte lastTouch = 0; //gives the player leeway - 10 frames to let go of shift, otherwise it will continually register
+short digTimer = 0; //player only timers
+short digWait = 5;
+byte change = 0;
+int noBlocksAbove;
+byte jumping;
+byte breaking;
+//player variables
+
+byte timeBetweenFall = 2; //how long to hold falling animation
+
+Particles singleBricks[NUM_BRICKS];
+unsigned char numActive = 0; //break block particles
+short brickSpeed = 5; //speed of particles
+short brickLifetime = 10; //lifetime of particles
 
 //960 is the largest map size...
 const char worldData[NumWorlds][LargestWorld] = {
@@ -160,4 +180,5 @@ const int note_table[64] = {
   269,254,240,226,214,202,190,180,
   169,160,151,143,135,127,120,113,
 };
+
 

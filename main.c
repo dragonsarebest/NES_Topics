@@ -828,714 +828,517 @@ void updateBossMetaSprites()
   }
 }
 
-
-int metaSpriteCollision(MetaActor * actor1, MetaActor * actor2, byte amountX, byte amountY)
+int absVal(int x)
 {
-  int diffX = (actor1->act.x - actor2->act.x);
-  int diffY = (actor1->act.y - actor2->act.y);
-  int maskY = diffY >> 7;
-  int maskX = diffX >> 7;
-  maskX += diffX;
-  maskX = (maskX + diffX) ^ maskX;
-  maskY += diffY;
-  maskY = (maskY + diffY) ^ maskY;
-
-  return((maskX <= amountX) * 0x02) | (maskY <= amountY);
+  int mask = x >> 7;
+  mask += x;
+  mask = (mask + x) ^ mask;
+  return mask;
 }
 
+int spriteCollision(Actor * actor1, Actor * actor2, byte amountX, byte amountY)
+{
+  int diffX = (actor1->x - actor2->x);
+  int diffY = (actor1->y - actor2->y);
+  diffX = absVal(diffX);
+  diffY = absVal(diffY);
+  return((diffX <= amountX) * 0x02) | (diffY <= amountY);
+}
 
-void main(void) {
+void updateMetaSprites(MetaActor * actor)
+{
+  updateMetaSprite(actor->act.attribute, MetaTable[actor->act.currentAnimation]);
+}
 
-  char cur_oam;
+char updateActor(Actor * actor, char cur_oam)
+{
+  int i = 0;
+  int res = 0;
+  char breakBlock;
+  char pad_result = pad_poll(0) | pad_poll(1);
 
-  //byte lastFacingRight = true;
-  //byte playerInAir = true;
-  byte run = 0;
-  byte swing = 0;
-  
-  byte timeBetweenFall = 2;
-  byte fallTimer = 0;
-  short digTimer = 0;
-  short digWait = 5;
-  byte Up_Down = 0; //minning up or down, or straight ahead
-  byte lastTouch = 0; //gives the player leeway - 10 frames to let go of shift, otherwise it will continually register
-  //player variables
+  /// 1111 1111, 0x01 = playerInAir,0x02 = lastFacingRight, 0x04 = isAttacking, 0x08 = is Player
+  byte playerInAir = (actor->boolean & 0x01);
+  byte lastFacingRight = (actor->boolean & 0x02) >> 1;
+  byte attacking = (actor->boolean & 0x04) >> 2;
+  byte isPlayer = (actor->boolean & 0x08) >> 3;
+  byte isBoss = (actor->boolean & 0x10) >> 4;
 
-  SpriteActor feet; //this is a debug variable
-
-
-  Particles singleBricks[NUM_BRICKS];
-  unsigned char numActive = 0; //break block particles
-  short brickSpeed = 5; //speed of particles
-  short brickLifetime = 10; //lifetime of particles
-
-  unsigned int i = 0, j = 0;
-
-  worldScrolling = false;
-  scrollSwap = !worldScrolling;
-  old_worldScrolling = worldScrolling;
-  worldNumber = 0;
-  transition = 0x01;
-  //default world parameters
-
-  pal_all(PALETTE);// generally before game loop (in main)
-
-  feet.act.x = 0;
-  feet.act.y = 0;
-  feet.sprite = 0x0F;
-
-  player.act.x = 8*1;
-  player.act.y = 23* 8;
-  //starting player position
-
-  player.act.dx = 0;
-  player.act.dy = 0;
-  player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
-
-  player.act.alive = 10; // hit points
-  player.act.moveSpeed = 1;
-  player.act.jumpSpeed = 4;
-  player.act.grounded = true;
-  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER
-  player.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04 | 0x05;
-
-  boss.act.alive = 0;
-  boss.act.moveSpeed = 2;
-  boss.act.jumpSpeed = 4;
-  boss.act.grounded = true;
-  boss.act.dx = 0;
-  boss.act.dy = 0;
-  boss.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
-  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER
-  boss.boolean = 0x01 | 0*0x02 | 0*0x03 | 0*0x04 | 0*0x05;
-
-
-  randomizeParticle(singleBricks, brickSpeed, 0, 0);
-  // enable PPU rendeing (turn on screen)
-
-  loadWorld();
-
-  updatePlayerSprites();
-
-  ppu_on_all();
-
-  //always updates @ 60fps
-  while (1)
+  //
+  if(isPlayer)
   {
-    int noBlocksAbove;
-    byte jumping;
-    byte breaking;
-    byte change;
+    noBlocksAbove = 0;
+    jumping = 0;
+    breaking = 0;
+    //player only variables
+  }
 
-    int res = 0;
-    char breakBlock;
-    char pad_result= pad_poll(0) | pad_poll(1);
-    
-    byte lastFacingRight = (player.boolean & 0x02) >> 1;
-    byte playerInAir = (player.boolean & 0x01);
-    
-    //oam_clear();
-    //cur_oam = oam_spr(stausX, stausY, 0xA0, 0, 0);
-    cur_oam = 4;
+  if(actor->alive > 0 || isPlayer)
+  {
+    res = searchPlayer(actor->x, actor->y, 1, lastFacingRight, 0);
 
-
-    player.act.dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6) ;
-    res = searchPlayer(player.act.x, player.act.y, 1, lastFacingRight, 0);
-
-    if(worldScrolling)
+    if(!isPlayer && actor->hurtFlash == 0)
     {
-      player.act.dx = 0;
-      player.act.dy = 0;
+      //set pad_result here to simulate input for other entities
+      pad_result = 0;
+      
+      if(absVal(actor->x - player.act.x) > 16)
+      {
+        if(actor->x < player.act.x)
+        {
+          pad_result |= 0x80;
+        }
+        else if(actor->x > player.act.x)
+        {
+          pad_result |= 0x40;
+        }
+      }
+      
+      //go toward player basic script
+      
+      if(isBoss)
+      {
+        if(bossNumber == 0)
+        {
+          //chain chomp
+          if(attacking)
+          {
+            pad_result &= 0x3F;
+          }
+        }
+      }
+    }
+
+    //input from trackpad!
+    
+    actor->dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6);
+    
+    if((pad_result & 0x80)>>7 && lastFacingRight == false)
+    {
+      actor->boolean |= 0x02;
+      lastFacingRight = (actor->boolean & 0x02) >> 1;
     }
     else
     {
-
-      if(spawnBoss)
+      if((pad_result & 0x40)>>6 && lastFacingRight)
       {
-        //always first thing to run once a new world is loaded
+        actor->boolean = actor->boolean & 0xFD; //1111 1101
+        lastFacingRight = (actor->boolean & 0x02) >> 1;
+      }
+    }
 
-        updatePlayerHealth(0, &player);
-        updateBombBlockLives(0, 0x01);
-        updateBombBlockLives(0, 0x02);
-        updateBombBlockLives(0, 0x03);
+    {
+      byte shift = pad_result & 0x02;
+      jumping = pad_result & 0x10;
+      breaking = pad_result & 0x04;
+      noBlocksAbove = aboveOrBellowPlayer(actor->x, actor->y, 1, true, lastFacingRight, 0);
 
-        spawnBoss = false;
-        //get spawn location & which boss here
-        if(worldNumber == 1 && (bossSpawnedTracker & 0x01) == 0)
-        {
-          bossSpawnedTracker |= 0x01; //only spawn boss once!
-          bossNumber = 0;
-          boss.act.attribute = 1;
-          boss.act.x = 28*8;
-          boss.act.y =  25*8;
-          boss.act.alive = 20;
-          boss.act.moveSpeed = 2;
-          boss.act.jumpSpeed = 4;
-          //seettings for world 1 boss
-        }
+      if(breaking != 0 || player.act.animationTimer != 0 && attacking || shift != 0)
+      {
+        jumping = 0;
+        //cannot jump & break @ same time
       }
 
-      if((pad_result & 0x80)>>7 && lastFacingRight == false)
+      //Up_Down = 0;
+      if(shift)
       {
-        player.boolean |= 0x02;
-        lastFacingRight = (player.boolean & 0x02) >> 1;
+        if((pad_result & 0x20))
+        {
+          noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, false, lastFacingRight, 0);
+          {
+            //pressing down on keypad
+            Up_Down = 0x01;
+            lastTouch = 10;
+          }
+        }
+        else if(((pad_result & 0x10)))
+        {
+          //pressing up but cant jump.... look up instead!
+          Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
+          lastTouch = 10;
+        }
+        else if(lastTouch <= 0)
+        {
+          Up_Down = 0x00; 
+        }
+
+      }
+      if(lastTouch > 0)
+      {
+        lastTouch--;
+      }
+    }
+
+    actor->attribute = (actor->attribute & 0xBF) | (!lastFacingRight  << 6);
+
+    if((res & 0x0C) != 0 && actor->dx > 0)
+    {
+      //player.act.dx = -1;
+      actor->dx = 0;
+    }
+    if((res & 0x03) != 0 && actor->dx < 0)
+    {
+      //player.act.dx = 1;
+      actor->dx = 0;
+      actor->x -= (actor->x % 8) > 0;
+    }
+
+    res = 0;
+
+    for(i = 0; i < 6; i++)
+    {
+
+      if(i >= 4 && actor->dy == 0)
+      {
+        groundBlock[i] = 0;
       }
       else
       {
-        if((pad_result & 0x40)>>6 && lastFacingRight)
+        if(!(actor->dy > 0 && playerInAir) && (i == 2 || i == 3))
         {
-          player.boolean = player.boolean & 0xFD; //1111 1101
-          lastFacingRight = (player.boolean & 0x02) >> 1;
+          groundBlock[i] = 0;
         }
-      }
-
-      player.act.attribute = (player.act.attribute & 0xBF) | (!lastFacingRight  << 6);
-      updatePlayerSprites();
-
-
-      if((res & 0x0C) != 0 && player.act.dx > 0)
-      {
-        //player.act.dx = -1;
-        player.act.dx = 0;
-      }
-      if((res & 0x03) != 0 && player.act.dx < 0)
-      {
-        //player.act.dx = 1;
-        player.act.dx = 0;
-        player.act.x -= (player.act.x % 8) > 0;
-      }
-
-      res = 0;
-
-      for(i = 0; i < 6; i++)
-      {
-
-        if(i >= 4 && player.act.dy == 0)
+        else if(! (actor->dy * actor->jumpSpeed >= 8) && (i == 4 || i == 5))
         {
           groundBlock[i] = 0;
         }
         else
         {
-          if(!(player.act.dy > 0 && playerInAir) && (i == 2 || i == 3))
+          groundBlock[i] = checkGround((actor->x/8) + (i%2), ((actor->y)/8)+2 + (i/2), 1);
+        }
+
+      }
+      res = res | groundBlock[i];
+    }
+
+    if(res != 0)
+    {
+      actor->grounded = true;
+    }
+    else
+    {
+      actor->grounded = false;
+      if(actor->grounded == false && playerInAir == false)
+      {
+        //start falling! we walk off a block and dont jump
+        actor->jumpTimer = MAX_JUMP/2;
+        actor->boolean |= 0x01;
+        playerInAir = actor->boolean&0x01;
+        actor->fallTimer = 0;
+      }
+    }
+
+    //dont let boss & player collide
+    if(boss.act.hurtFlash == 0 && isPlayer)
+    {
+      //int returnVal = metaSpriteCollision(&player, &boss, 24, 24);
+      int returnVal = spriteCollision(&player.act, &boss.act, 30, 24);
+      if(returnVal >= 0x03  && boss.act.alive)
+      {
+        if(player.act.dx > 0 && boss.act.x > player.act.x || actor->dx < 0 && boss.act.x < player.act.x)
+        {
+          player.act.dx = 0;
+        }
+
+        //allows player to stand on boss
+        if(returnVal == 0x03)
+        {
+          player.act.dy = 0;
+          player.act.boolean = player.act.boolean & 0xFE;
+          playerInAir = player.act.boolean&0x01;
+          player.act.jumpTimer = 0;
+          player.act.grounded = true;
+        }
+        if(returnVal >= 0x03)
+        {
+          //if the chain chomp is facing player
+          if(attacking == false && actor->hurtFlash == 0 && ( ((boss.act.attribute & 0x40) && player.act.x <= boss.act.x ) || (!(boss.act.attribute & 0x40) && player.act.x >= boss.act.x )))
           {
-            groundBlock[i] = 0;
+            attacking = true;
+            actor->boolean |= 0x04;
+            
+            player.act.hurtFlash += 10;
+
+            change |= 0x30;
+
+            player.act.dy = -5;
+
+            if(boss.act.x > player.act.x)
+            {
+              player.act.dx = -10;
+            }
+            else
+            {
+              player.act.dx = 10;
+            }
           }
-          else if(! (player.act.dy * player.act.jumpSpeed >= 8) && (i == 4 || i == 5))
+        }
+      }
+      
+      //extended reach for player to hit
+      returnVal = returnVal | spriteCollision(&player.act, &boss.act, 45, 24);
+      if(returnVal >= 0x03)
+      {
+        if(breaking)
+        {
+          //only hurt boss when swinging sword
+          boss.act.hurtFlash += 10;
+
+          //player only does one "hit" at a time
+          boss.act.alive -=1;
+
+          boss.act.dy = -3;
+
+          if(boss.act.x < player.act.x)
           {
-            groundBlock[i] = 0;
+            boss.act.dx = -20;
           }
           else
           {
-            groundBlock[i] = checkGround((player.act.x/8) + (i%2), ((player.act.y)/8)+2 + (i/2), 1);
+            boss.act.dx = 20;
           }
-
         }
-        res = res | groundBlock[i];
-      }
 
-      if(res != 0)
+      }
+    }
+
+    if(actor->grounded && playerInAir)
+    {
+
+      int itemY = 0;
+
+      if((groundBlock[0] | groundBlock[1]) && ! (groundBlock[2] | groundBlock[3]))
       {
-        player.act.grounded = true;
+        itemY = 0;
       }
       else
       {
-        player.act.grounded = false;
-        if(player.act.grounded == false && playerInAir == false)
-        {
-          //start falling! we walk off a block and dont jump
-          player.act.jumpTimer = MAX_JUMP/2;
-          player.boolean |= 0x01;
-          playerInAir = player.boolean&0x01;
-          fallTimer = 0;
-        }
+        itemY = 1;
       }
 
+      actor->y = ((actor->y/8) + itemY)*8;
 
+      actor->dy = 0;
+
+      actor->boolean = actor->boolean & 0xFE;
+      playerInAir = actor->boolean&0x01;
+      //player.act.grounded = false;
+      actor->jumpTimer = 0;
+
+    }
+
+
+    if(actor->jumpTimer != MAX_JUMP-1 && !playerInAir)
+    {
+      if(actor->grounded == true && noBlocksAbove == 0 && jumping && actor->hurtFlash == 0)
       {
-        byte shift = pad_result & 0x02;
-        jumping = pad_result & 0x10;
-        breaking = pad_result & 0x04;
-        noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, true, lastFacingRight, 0);
-
-        if(breaking != 0 || swing != 0 || shift != 0)
-        {
-          jumping = 0;
-          //cannot jump & break @ same time
-        }
-
-        //Up_Down = 0;
-        if(shift)
-        {
-          if((pad_result & 0x20))
-          {
-            noBlocksAbove = aboveOrBellowPlayer(player.act.x, player.act.y, 1, false, lastFacingRight, 0);
-            {
-              //pressing down on keypad
-              Up_Down = 0x01;
-              lastTouch = 10;
-            }
-          }
-          else if(((pad_result & 0x10)))
-          {
-            //pressing up but cant jump.... look up instead!
-            Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
-            lastTouch = 10;
-          }
-          else if(lastTouch <= 0)
-          {
-            Up_Down = 0x00; 
-          }
-
-        }
-        if(lastTouch > 0)
-        {
-          lastTouch--;
-        }
+        //if grounded and you try to jump...
+        actor->jumpTimer = 0;
+        actor->dy = jumpTable[actor->jumpTimer];
+        actor->jumpTimer++;
+        actor->boolean |= 0x01;
+        playerInAir = actor->boolean&0x01;
+        actor->fallTimer = 0;
       }
 
-
-      if(numActive)
-        for(i = 0; i < NUM_BRICKS; i++)
-        {
-          if(singleBricks[i].lifetime > 0)
-          {
-            cur_oam = oam_spr(singleBricks[i].x, singleBricks[i].y, singleBricks[i].sprite ,singleBricks[i].attribute, cur_oam);
-            {
-              singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx;
-              singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy;
+    }
 
 
-              if(singleBricks[i].lifetime != 1)
-              {
-                singleBricks[i].lifetime--;
-              }
-              else
-              {
-                singleBricks[i].lifetime = 0;
-                numActive--;
-              }
+    if(playerInAir && !actor->grounded)
+    {
 
-            }
-          }
-        }
-
-
-
-      if(hurtPlayer == 0)
+      if(actor->fallTimer == 0)
       {
-        byte offset = 1;
-        int upOffset = 0;
 
-        if(lastFacingRight == false)
-        {
-          offset = 0; //fixes bug where you couldnt break blocks on your left if you were touching them
-        }
-        if(Up_Down == 0x01)
-        {
-          // up
-          upOffset = 1;
-        }
-        else if(Up_Down == 0x02)
-        {
-          // down
-          upOffset = -1;
-        }
-        else
-        {
-          upOffset = 0;
-        }
-        setSelectedPosition(player.act.x, player.act.y, upOffset, lastFacingRight, offset, 0);
+        //going up or down in the air
+        actor->dy = jumpTable[actor->jumpTimer];
+        if(actor->jumpTimer != MAX_JUMP-1)
+          actor->jumpTimer++;
+      }
 
-        if(swing == 0)
-        {
-          char newBlock = 0x0D;
+      actor->fallTimer++;
+      actor->fallTimer = actor->fallTimer % timeBetweenFall;
 
-          breakBlock = searchPlayer(player.act.x, player.act.y + (upOffset*8), 0, lastFacingRight, offset);
-          //1101
-          if(breaking)
+    }
+
+    //player only behavior
+    if(actor->hurtFlash == 0 && isPlayer)
+    {
+      byte offset = 1;
+      int upOffset = 0;
+
+      if(lastFacingRight == false)
+      {
+        offset = 0; //fixes bug where you couldnt break blocks on your left if you were touching them
+      }
+      if(Up_Down == 0x01)
+      {
+        // up
+        upOffset = 1;
+      }
+      else if(Up_Down == 0x02)
+      {
+        // down
+        upOffset = -1;
+      }
+      else
+      {
+        upOffset = 0;
+      }
+      setSelectedPosition(actor->x, actor->y, upOffset, lastFacingRight, offset, 0);
+
+      if(attacking == false)
+      {
+        char newBlock = 0x0D;
+
+        breakBlock = searchPlayer(actor->x, actor->y + (upOffset*8), 0, lastFacingRight, offset);
+        //1101
+        if(breaking)
+        {
+          attacking = true;
+          actor->boolean |= 0x04;
+          actor->animationTimer = 0;
+        }
+        if((breakBlock != 0) && breaking || selectedPosition[2] != 0 && breaking)
+        {
+
+          int itemX, itemY, collision;
+          byte suitableOption = true;
+          //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
+          //outsideHelper = breakBlock;
+
+          if(lastFacingRight)
           {
-            swing = 1;
+            collision = -2;
           }
-          if((breakBlock != 0) && breaking || selectedPosition[2] != 0 && breaking)
+          else
           {
+            collision = 1;
+          }
 
-            int itemX, itemY, collision;
-            byte suitableOption = true;
-            //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
-            //outsideHelper = breakBlock;
-
+          if((breakBlock & 0x02) != 0)
+          {
+            itemX = ((actor->x/8)+(lastFacingRight*3 - 1) + collision + offset);
+            itemY = actor->y/8 + 1;
+          }
+          else if((breakBlock & 0x01) != 0)
+          {
+            itemX = ((actor->x/8)+(lastFacingRight*3 - 1) + collision + offset);
+            itemY = actor->y/8;
+          }
+          else
+          {
             if(lastFacingRight)
             {
-              collision = -2;
+              collision = -1;
             }
             else
             {
-              collision = 1;
+              collision = 2;
             }
 
-            if((breakBlock & 0x02) != 0)
+            if((breakBlock & 0x08) != 0)
             {
-              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-              itemY = player.act.y/8 + 1;
+              itemX = ((actor->x/8)+(lastFacingRight*3 - 1) + collision + offset);
+              itemY = actor->y/8 + 1;
             }
-            else if((breakBlock & 0x01) != 0)
+            else if((breakBlock & 0x04) != 0)
             {
-              itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-              itemY = player.act.y/8;
+              itemX = ((actor->x/8)+(lastFacingRight*3 - 1) + collision + offset);
+              itemY = actor->y/8;
             }
             else
             {
-              if(lastFacingRight)
-              {
-                collision = -1;
-              }
-              else
-              {
-                collision = 2;
-              }
-
-              if((breakBlock & 0x08) != 0)
-              {
-                itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-                itemY = player.act.y/8 + 1;
-              }
-              else if((breakBlock & 0x04) != 0)
-              {
-                itemX = ((player.act.x/8)+(lastFacingRight*3 - 1) + collision + offset);
-                itemY = player.act.y/8;
-              }
-              else
-              {
-                suitableOption = false; 
-              }
+              suitableOption = false; 
             }
+          }
 
-            if(suitableOption)
+          if(suitableOption)
+          {
+            itemY += upOffset;
+            //updateBombBlockLives(1, 0x02);
+
+            //check if it's a door (c4->c7)
+            //if it is replace with stair blocks
+            //else put background block in
+
             {
-              itemY += upOffset;
-              //updateBombBlockLives(1, 0x02);
+              char oldBlock;
+              ppu_wait_nmi();
+              oldBlock = getchar_vram(itemX, itemY);
 
-              //check if it's a door (c4->c7)
-              //if it is replace with stair blocks
-              //else put background block in
+              //outsideHelper = oldBlock;
 
+              if(oldBlock >= 0xC4 && oldBlock <= 0xC7)
               {
-                char oldBlock;
-                ppu_wait_nmi();
-                oldBlock = getchar_vram(itemX, itemY);
+                int x = itemX, y = itemY, i;
+                //0xFc -> 0xFF
+                newBlock = 0xFc + (oldBlock -  0xC4);
 
-                //outsideHelper = oldBlock;
 
-                if(oldBlock >= 0xC4 && oldBlock <= 0xC7)
+                if(oldBlock == 0xC5)
                 {
-                  int x = itemX, y = itemY, i;
-                  //0xFc -> 0xFF
-                  newBlock = 0xFc + (oldBlock -  0xC4);
+                  y--;
+                }
+                if( oldBlock == 0xc6)
+                {
+                  x--;
+                }
+                if(oldBlock == 0xc7)
+                {
+                  x--;
+                  y--;
+                }
 
-
-                  if(oldBlock == 0xC5)
+                for(i = 0; i < numDoors; i++)
+                {
+                  if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
                   {
-                    y--;
-                  }
-                  if( oldBlock == 0xc6)
-                  {
-                    x--;
-                  }
-                  if(oldBlock == 0xc7)
-                  {
-                    x--;
-                    y--;
-                  }
-
-                  for(i = 0; i < numDoors; i++)
-                  {
-                    if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
+                    DoorInfo[i]--;
+                    if(DoorInfo[i] == 0)
                     {
-                      DoorInfo[i]--;
-                      if(DoorInfo[i] == 0)
-                      {
-                        UpTo8DoorsOpen = UpTo8DoorsOpen | 1 << i;
-                        //stairwellAccessable!
+                      UpTo8DoorsOpen = UpTo8DoorsOpen | 1 << i;
+                      //stairwellAccessable!
 
-                      }
-                      break;
                     }
+                    break;
                   }
-
-                }
-
-
-              }
-
-              {
-                char block[1];
-                block[0] = newBlock;
-
-                setGround(itemX, itemY, 0);
-
-                updateScreen(itemX, itemY, block, 1);
-
-                change |= 0x02;
-
-                numActive = NUM_BRICKS;
-
-                for(i = 0; i < numActive; i++)
-                {
-                  singleBricks[i].lifetime = brickLifetime;
-                  singleBricks[i].x = itemX*8-5;
-                  singleBricks[i].y = itemY*8;
-
                 }
 
               }
+
+
             }
-          }
-        }
-      }
 
-
-      if(boss.act.alive > 0)
-      {
-        unsigned char * currentMeta;
-        if(bossNumber == 0)
-        {
-          currentMeta = ChainChomp_stand;
-          
-          if(hurtBoss == 0)
-          {
-            //boss logic
-          }
-          
-        }
-        //update & draw boss...
-
-        //true = right = 1, false = left = 0
-        boss.act.attribute = (boss.act.attribute & 0xBF) | (!(boss.act.dx > 0)  << 6);
-        updateBossMetaSprites();
-        cur_oam = oam_meta_spr(boss.act.x, boss.act.y, cur_oam, currentMeta);
-      }
-      else
-      {
-        //makes stairs go to next level!
-        for(i = 0; i < numDoors; i++)
-        {
-          if(((UpTo8DoorsOpen >> i) & 0x01) == 1)
-          {
-            //then these stairs are open!
-            if(jumping && player.act.x/8 >= DoorPositions[i*2]-1 && player.act.x/8 <= DoorPositions[i*2]+1
-               && player.act.y/8 >= DoorPositions[i*2 + 1]-1 && player.act.y/8 <= DoorPositions[i*2 + 1]+1)
             {
-              jumping = false;
+              char block[1];
+              block[0] = newBlock;
 
-              setWorldNumber(StairsGoToWorld[i]);
-              worldScrolling = true;
+              setGround(itemX, itemY, 0);
 
-              ppu_off(); //makes scrolling work!!!!!!
-            }
-          }
-        }
-      }
+              updateScreen(itemX, itemY, block, 1);
 
-      //dont let boss & player collide
-      if(hurtBoss == 0)
-      {
-        int returnVal = -1;
-        //returnVal = metaSpriteCollision(&player, &boss, 24, 24);
-        returnVal = metaSpriteCollision(&player, &boss, 30, 24);
-        if(returnVal >= 0x03  && boss.act.alive)
-        {
-          
-          
-          if(player.act.dx > 0 && boss.act.x > player.act.x || player.act.dx < 0 && boss.act.x < player.act.x)
-          {
-            player.act.dx = 0;
-          }
-          
-          //if(player.act.dy > 0 && boss.act.y > player.act.y || player.act.dy < 0 && boss.act.y < player.act.y)
-          if(returnVal == 0x03)
-          {
-            player.act.dy = 0;
-            player.boolean = player.boolean & 0xFE;
-            playerInAir = player.boolean&0x01;
-            player.act.jumpTimer = 0;
-            player.act.grounded = true;
-          }
-          
-          //if(bossNumber == 0)
-          {
-            //only hurts player when theyre facing eachother
-            //if(hurtPlayer == 0 && ( (boss.act.attribute & 0x40) != (player.act.attribute & 0x40) ))
-            
-            if(hurtPlayer == 0 && ( ((boss.act.attribute & 0x40) && player.act.x <= boss.act.x ) || (!(boss.act.attribute & 0x40) && player.act.x >= boss.act.x )))
-            {
-              hurtPlayer += 10;
-              
-              change |= 0x30;
-              
-              player.act.dy = -5;
-              
-              if(boss.act.x > player.act.x)
+              change |= 0x02;
+
+              numActive = NUM_BRICKS;
+
+              for(i = 0; i < numActive; i++)
               {
-                player.act.dx = -10;
+                singleBricks[i].lifetime = brickLifetime;
+                singleBricks[i].x = itemX*8-5;
+                singleBricks[i].y = itemY*8;
+
               }
-              else
-              {
-                player.act.dx = 10;
-              }
+
             }
-            
-            if(breaking)
-            {
-              //only hurt boss when swinging sword
-              hurtBoss += 10;
-              
-              //player only does one "hit" at a time
-              boss.act.alive -=1;
-              
-              boss.act.dy = -3;
-              
-              if(boss.act.x < player.act.x)
-              {
-                boss.act.dx = -10;
-              }
-              else
-              {
-                boss.act.dx = 10;
-              }
-            }
-            
           }
-          
         }
       }
 
-
-      if(player.act.grounded && playerInAir)
-      {
-
-        int itemY = 0;
-
-        if((groundBlock[0] | groundBlock[1]) && ! (groundBlock[2] | groundBlock[3]))
-        {
-          itemY = 0;
-        }
-        else
-        {
-          itemY = 1;
-        }
-
-        player.act.y = ((player.act.y/8) + itemY)*8;
-
-        player.act.dy = 0;
-
-        player.boolean = player.boolean & 0xFE;
-        playerInAir = player.boolean&0x01;
-        //player.act.grounded = false;
-        player.act.jumpTimer = 0;
-
-      }
+      //placing blocks
 
 
-      if(player.act.jumpTimer != MAX_JUMP-1 && !playerInAir)
-      {
-        if(player.act.grounded == true && noBlocksAbove == 0 && jumping && hurtPlayer == 0)
-        {
-          //if grounded and you try to jump...
-          player.act.jumpTimer = 0;
-          player.act.dy = jumpTable[player.act.jumpTimer];
-          player.act.jumpTimer++;
-          player.boolean |= 0x01;
-          playerInAir = player.boolean&0x01;
-          fallTimer = 0;
-        }
-
-      }
-
-
-      if(playerInAir && !player.act.grounded)
-      {
-
-        if(fallTimer == 0)
-        {
-
-          //going up or down in the air
-          player.act.dy = jumpTable[player.act.jumpTimer];
-          if(player.act.jumpTimer != MAX_JUMP-1)
-            player.act.jumpTimer++;
-        }
-
-        fallTimer++;
-        fallTimer = fallTimer%timeBetweenFall;
-
-      }
-
-
-      {
-        //animate the player!
-        byte shoudlRun = true;
-
-        if(swing != 0)
-        {
-          shoudlRun = false;
-          if( swing < 4)
-          {
-            cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_1);
-            ppu_wait_frame();
-            ppu_wait_frame();
-            swing++;
-          }
-          else if(swing >= 4 && swing < 8) 
-          {
-            cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_2);
-            ppu_wait_frame();
-            ppu_wait_frame();
-            swing++; 
-          }
-          else
-          {
-            swing = 0;
-            shoudlRun = true;
-          }
-        }
-
-        if(shoudlRun)
-        {
-          if(playerInAir)
-          {
-            cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Jump);
-          }
-          else if(player.act.dx != 0 && player.act.grounded && !worldScrolling)
-          {
-            if(run < 4)
-            {
-              cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
-              run++;
-            }
-            else if (run >= 4 && run < 8)
-            {
-              cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
-              run++;
-            }
-            else
-            {
-              cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
-              run = 0;
-            }
-          }
-          else
-          {
-            cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
-          }
-        }
-
-      }
-
-
-      //placing
-
-      cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
-
-      if((pad_result&0x08)>>3 && numBlocks > 0 && hurtPlayer == 0)
+      if((pad_result&0x08)>>3 && numBlocks > 0 && player.act.hurtFlash == 0)
       {
         int deltaX = 0;
         int deltaY = 0;
@@ -1585,31 +1388,296 @@ void main(void) {
         }
       }
 
+
+      if(boss.act.alive <= 0)
+      {
+        //makes stairs go to next level!
+        for(i = 0; i < numDoors; i++)
+        {
+          if(((UpTo8DoorsOpen >> i) & 0x01) == 1)
+          {
+            //then these stairs are open!
+            if(jumping && actor->x/8 >= DoorPositions[i*2]-1 && actor->x/8 <= DoorPositions[i*2]+1
+               && actor->y/8 >= DoorPositions[i*2 + 1]-1 && actor->y/8 <= DoorPositions[i*2 + 1]+1)
+            {
+              jumping = false;
+
+              setWorldNumber(StairsGoToWorld[i]);
+              worldScrolling = true;
+
+              ppu_off(); //makes scrolling work!!!!!!
+            }
+          }
+        }
+      }
+
+    }
+  }
+  
+  //make them flash when hurt
+  if(actor->hurtFlash != 0)
+  {
+    actor->hurtFlash--;
+    if(actor->hurtFlash%2)
+      actor->attribute = !(actor->attribute & 0x03) | actor->attribute & 0xFC;
+  }
+  else
+  {
+    actor->attribute = !(0 & 0x03) | actor->attribute & 0xFC;
+  }
+  
+
+  {
+    //animate the player!
+    byte shoudlRun = true;
+
+    if(attacking)
+    {
+      shoudlRun = false;
+      if( actor->animationTimer < 8)
+      {
+        actor->currentAnimation = actor->startOfAnimations+1;
+
+        //cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_1);
+        //ppu_wait_frame();
+        //ppu_wait_frame();
+        actor->animationTimer++;
+      }
+      else if(actor->animationTimer >= 8 && actor->animationTimer < 24) 
+      {
+        actor->currentAnimation = actor->startOfAnimations+2;
+        //cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_2);
+        //ppu_wait_frame();
+        //ppu_wait_frame();
+        actor->animationTimer++; 
+      }
+      else
+      {
+        attacking = false;
+        actor->boolean = actor->boolean &  0xB;
+        shoudlRun = true;
+      }
     }
 
-    
-    //make them flash when hurt
-    if(hurtPlayer != 0)
+    if(shoudlRun)
     {
-      hurtPlayer--;
-      if(hurtPlayer%2)
-        player.act.attribute = !(player.act.attribute & 0x03) | player.act.attribute & 0xFC;
+      if(playerInAir)
+      {
+        //cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Jump);
+        actor->currentAnimation = actor->startOfAnimations+3;
+      }
+      else if(actor->dx != 0 && actor->grounded)
+      {
+        if(actor->animationTimer < 4)
+        {
+          //cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
+          actor->currentAnimation = actor->startOfAnimations+4;
+          actor->animationTimer++;
+        }
+        else if (actor->animationTimer >= 4 && actor->animationTimer < 8)
+        {
+          actor->currentAnimation = actor->startOfAnimations;
+          //cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
+          actor->animationTimer++;
+        }
+        else
+        {
+          actor->currentAnimation = actor->startOfAnimations+4;
+          //cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Run);
+          actor->animationTimer = 0;
+        }
+      }
+      else
+      {
+        actor->currentAnimation = actor->startOfAnimations;
+        //cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite);
+      }
+    }
+
+  }
+
+  if(!isPlayer)
+  {
+    //player is updated in scroll
+    actor->x += actor->dx * actor->moveSpeed;
+    actor->y += actor->dy * actor->jumpSpeed;
+    
+    actor->dx = 0;
+  }
+
+  return cur_oam;
+}
+
+char updateSpriteActors(SpriteActor * actor, char cur_oam)
+{
+  cur_oam = updateActor(&actor->act, cur_oam);
+  //updateSprites(actor);
+  return cur_oam;
+}
+
+char updateMetaActor(MetaActor * actor, char cur_oam)
+{
+  cur_oam = updateActor(&actor->act, cur_oam);
+  updateMetaSprites(actor);
+  return cur_oam;
+  //return cur_oam = oam_meta_spr(actor->act.x, actor->act.y, cur_oam, PlayerMetaSprite);
+}
+
+void main(void) {
+
+  char cur_oam;
+
+  unsigned int i = 0, j = 0;
+
+  worldScrolling = false;
+  scrollSwap = !worldScrolling;
+  old_worldScrolling = worldScrolling;
+  worldNumber = 0;
+  transition = 0x01;
+  //default world parameters
+
+  MetaTable[0] = PlayerMetaSprite;		//idle
+  MetaTable[1] = PlayerMetaSprite_Attack_1;	//attack 1
+  MetaTable[2] = PlayerMetaSprite_Attack_2;	//attack 2
+  MetaTable[3] = PlayerMetaSprite_Jump;		//jump
+  MetaTable[4] = PlayerMetaSprite_Run;		//run
+
+  MetaTable[5] = ChainChomp_stand;		//idle
+  MetaTable[6] = ChainChomp_stand;		//attack 1
+  MetaTable[7] = ChainChomp_stand;		//attack 2
+  MetaTable[8] = ChainChomp_stand;		//jump
+  MetaTable[9] = ChainChomp_stand;		//run
+
+  pal_all(PALETTE);// generally before game loop (in main)
+
+  player.act.x = 8*1;
+  player.act.y = 23* 8;
+
+  player.act.dx = 0;
+  player.act.dy = 0;
+  player.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
+  player.act.alive = 10; // hit points
+  player.act.moveSpeed = 1;
+  player.act.jumpSpeed = 4;
+  player.act.grounded = true;
+  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER, 0x10 = isBoss
+  player.act.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04 | 0x08 | 0*0x10;
+  player.act.currentAnimation = 0;
+  player.act.startOfAnimations = 0;
+
+  boss.act.alive = 0;
+  boss.act.moveSpeed = 6;
+  boss.act.jumpSpeed = 2;
+  boss.act.grounded = true;
+  boss.act.dx = 0;
+  boss.act.dy = 0;
+  boss.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
+  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER, 0x10 = isBoss
+  boss.act.boolean = 0x01 | 0*0x02 | 0*0x03 | 0*0x04 | 0*0x08 | 0x10;
+  boss.act.currentAnimation = 0;
+  boss.act.startOfAnimations = 5;
+
+  randomizeParticle(singleBricks, brickSpeed, 0, 0);
+  // enable PPU rendeing (turn on screen)
+
+  loadWorld();
+
+  ppu_on_all();
+
+  //always updates @ 60fps
+  while (1)
+  {
+    change = 0;
+    cur_oam = 4;
+
+    if(worldScrolling)
+    {
+      player.act.dx = 0;
+      player.act.dy = 0;
+
+      boss.act.dx = 0;
+      boss.act.dy = 0;
+
+      //dont allow any actors to move or update!
     }
     else
     {
-      player.act.attribute = !(0 & 0x03) | player.act.attribute & 0xFC;
+
+      if(spawnBoss)
+      {
+        //always first thing to run once a new world is loaded
+
+        updatePlayerHealth(0, &player);
+        updateBombBlockLives(0, 0x01);
+        updateBombBlockLives(0, 0x02);
+        updateBombBlockLives(0, 0x03);
+
+        spawnBoss = false;
+        //get spawn location & which boss here
+        if(worldNumber == 1 && (bossSpawnedTracker & 0x01) == 0)
+        {
+          bossSpawnedTracker |= 0x01; //only spawn boss once!
+          bossNumber = 0;
+          boss.act.attribute = 1;
+          boss.act.x = 28*8;
+          boss.act.y =  25*8;
+          boss.act.alive = 20;
+          boss.act.moveSpeed = 2;
+          boss.act.jumpSpeed = 4;
+          boss.act.currentAnimation = 0;
+          boss.act.startOfAnimations = 5;
+          //seettings for world 1 boss
+        }
+      }
+
+      //update every actor...
+      cur_oam = updateMetaActor(&player, cur_oam);
+      //selection reticle
+      cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
+      cur_oam = updateMetaActor(&boss, cur_oam);
+
+      //update particles!
+      if(numActive)
+      {
+        for(i = 0; i < NUM_BRICKS; i++)
+        {
+          if(singleBricks[i].lifetime > 0)
+          {
+            cur_oam = oam_spr(singleBricks[i].x, singleBricks[i].y, singleBricks[i].sprite ,singleBricks[i].attribute, cur_oam);
+            {
+              singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx;
+              singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy;
+
+
+              if(singleBricks[i].lifetime != 1)
+              {
+                singleBricks[i].lifetime--;
+              }
+              else
+              {
+                singleBricks[i].lifetime = 0;
+                numActive--;
+              }
+
+            }
+          }
+        }
+      }
+
     }
-    
-    if(hurtBoss != 0)
+
+
+
+    //render all actors!
+    cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, MetaTable[player.act.currentAnimation]);
+
+    if(boss.act.alive > 0)
     {
-      hurtBoss--;
-      if(hurtBoss%2)
-        boss.act.attribute = !(boss.act.attribute & 0x03) | boss.act.attribute & 0xFC;
+      cur_oam = oam_meta_spr(boss.act.x, boss.act.y, cur_oam, MetaTable[boss.act.currentAnimation]);
     }
-    else
-    {
-      boss.act.attribute = !(0 & 0x03) | boss.act.attribute & 0xFC;
-    }
+
+
+    //scroll world
 
     scrollWorld(transition, &player);
 
@@ -1620,24 +1688,13 @@ void main(void) {
       updateBombBlockLives(((change&0x02) >> 1) - (change&0x01), 0x02);
       change = change & (0xFF ^ 0x03);
     }
-    
+
     if((change & 0x30) != 0)
     {
       updatePlayerHealth(1, &player);
       change = change & (0xFF ^ 0x30);
     }
 
-    //this makes it wait one frame in between updates
-    /*
-    updatePlayerHealth(1, &player);
-    updateBombBlockLives(1, 0x01);
-    updateBombBlockLives(1, 0x02);
-    updateBombBlockLives(1, 0x03);
-    if(player.act.alive == 0)
-    {
-      player.act.alive = 10;
-    }
-    */
     ppu_wait_frame();
   }
 }

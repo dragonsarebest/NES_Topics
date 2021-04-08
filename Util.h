@@ -18,11 +18,19 @@ typedef struct Actor
   int dx;
   int dy;
   unsigned char attribute;
-  unsigned char alive;
+  unsigned char alive; //health value - or a boolean
   unsigned char moveSpeed;
   unsigned char jumpSpeed;
-  char jumpTimer;
+  
   char grounded;
+  byte boolean; // 1111 1111, 0x01 = playerInAir,0x02 = lastFacingRight, 0x04 = isAttacking, 0x08 = is Player, 0x10 = is boss
+  int animationTimer; //0-15
+  char jumpTimer;
+  short fallTimer;
+  
+  byte hurtFlash; //how long to flash for
+  char currentAnimation;
+  char startOfAnimations;
 } Actor;
 
 typedef struct SpriteActor
@@ -35,11 +43,6 @@ typedef struct MetaActor
 {
   Actor act;
   unsigned char * metasprite;
-  byte boolean; // 1111 1111, 0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER
 } MetaActor;
 
 
-void updateMetaActor(MetaActor * actor)
-{
-  byte lastFacingRight = actor->boolean & 0x01;
-}
