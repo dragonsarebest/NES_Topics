@@ -917,7 +917,7 @@ char updateActor(Actor * actor, char cur_oam)
   {
     res = searchPlayer(actor->x, actor->y, 1, lastFacingRight, 0);
 
-    if(!isPlayer && actor->hurtFlash == 0)
+    if(!isPlayer && actor->hurtFlash == 0 && (actor->boolean & 0x80) != 0)
     {
       int dist = 16;
       //set pad_result here to simulate input for other entities
@@ -972,10 +972,12 @@ char updateActor(Actor * actor, char cur_oam)
       }
     }
     
-    if((actor->boolean&0x80) != 0 && !isPlayer)
+    /*
+    if((actor->boolean & 0x80) == 0 && !isPlayer)
     {
       pad_result = 0;
     }
+    */
 
     //input from trackpad!
 
