@@ -882,6 +882,8 @@ char updateActor(Actor * actor, char cur_oam)
   int res = 0;
   char breakBlock;
   char pad_result = pad_poll(0) | pad_poll(1);
+  
+  
 
   /// 1111 1111, 0x01 = playerInAir,0x02 = lastFacingRight, 0x04 = isAttacking, 0x08 = is Player
   byte playerInAir = (actor->boolean & 0x01);
@@ -892,6 +894,8 @@ char updateActor(Actor * actor, char cur_oam)
   byte isBlockable = (actor->boolean & 0x20) >> 5;
   byte isBlocked = (actor->boolean & 0x40) >> 6;
 
+  
+  
   int noBlocksAbove;
   byte jumping;
   byte breaking;
@@ -903,6 +907,10 @@ char updateActor(Actor * actor, char cur_oam)
     jumping = 0;
     breaking = 0;
     //player only variables
+  }
+  else
+  {
+    pad_result = 0;
   }
 
   if(actor->alive > 0 || isPlayer)
@@ -963,19 +971,24 @@ char updateActor(Actor * actor, char cur_oam)
         }
       }
     }
+    
+    if((actor->boolean&0x80) != 0 && !isPlayer)
+    {
+      pad_result = 0;
+    }
 
     //input from trackpad!
 
     actor->dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6);
 
-    if((pad_result & 0x80)>>7 && lastFacingRight == false)
+    if((pad_result & 0x80)>>7)
     {
       actor->boolean |= 0x02;
       lastFacingRight = (actor->boolean & 0x02) >> 1;
     }
     else
     {
-      if((pad_result & 0x40)>>6 && lastFacingRight)
+      if((pad_result & 0x40)>>6)
       {
         actor->boolean = actor->boolean & 0xFD; //1111 1101
         lastFacingRight = (actor->boolean & 0x02) >> 1;
@@ -1024,7 +1037,7 @@ char updateActor(Actor * actor, char cur_oam)
           }
           else
           {
-            groundBlock[i] = checkGround((actor->x/8) + (i%2), ((actor->y)/8)+2 + (i/2), 1);
+            groundBlock[i] = checkGround((actor->x/8) + (i%2), ((actor->y)/8)+2-actor->isSprite + (i/2), 1);
           }
 
         }
@@ -1577,7 +1590,13 @@ char updateActor(Actor * actor, char cur_oam)
 
   }
   {
-    int index = detectAllCollisions(actor, 16, 16);
+    char dist = 16;
+    int index;
+    if(actor->isSprite)
+    {
+      dist = 8;
+    }
+    index = detectAllCollisions(actor, dist, dist);
     if(index != -1)
     {
       //check to see if you are going toward them or away
@@ -1607,7 +1626,7 @@ char updateActor(Actor * actor, char cur_oam)
     }
     //actor->dx = 0;
   }
-
+  
   return cur_oam;
 }
 
@@ -1629,7 +1648,7 @@ char updateMetaActor(MetaActor * actor, char cur_oam)
 void main(void) {
 
   char cur_oam;
-
+  SpriteActor chain;
   unsigned int i = 0, j = 0;
 
   worldScrolling = false;
@@ -1656,9 +1675,27 @@ void main(void) {
   allMetaActors[0] = &player;
   allActors[1] = &boss.act;
   allMetaActors[1] = &boss;
+  
+  allSpriteActors[0] = &chain;
+  
 
   pal_all(PALETTE);// generally before game loop (in main)
-
+  
+  chain.sprite = 0xB3;
+  chain.act.x = 13*8;
+  chain.act.y = 13*8;
+  chain.act.dx = 0;
+  chain.act.dy = 0;
+  chain.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
+  chain.act.alive = 2; // hit points
+  chain.act.moveSpeed = 1;
+  chain.act.jumpSpeed = 4;
+  chain.act.grounded = true;
+  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x08 = IS_PLAYER, 0x10 = isBoss, 0x20 = is blockable, 0x80 = tracks
+  chain.act.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04 | 0*0x08 | 0*0x10 | 0x20;
+  chain.act.isSprite = true;
+  chain.act.hurtFlash = 0;
+  
   player.act.x = 8*1;
   player.act.y = 23* 8;
 
@@ -1669,10 +1706,12 @@ void main(void) {
   player.act.moveSpeed = 1;
   player.act.jumpSpeed = 4;
   player.act.grounded = true;
-  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER, 0x10 = isBoss, 0x20 = is blockable
-  player.act.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04 | 0x08 | 0*0x10 | 0x20;
+  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x08 = IS_PLAYER, 0x10 = isBoss, 0x20 = is blockable, 0x80 = tracks
+  player.act.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04 | 0x08 | 0*0x10 | 0x20 | 0x80;
   player.act.currentAnimation = 0;
   player.act.startOfAnimations = 0;
+  player.act.isSprite = false;
+  player.act.hurtFlash = 0;
 
   boss.act.alive = 0;
   boss.act.moveSpeed = 12;
@@ -1685,6 +1724,8 @@ void main(void) {
   boss.act.boolean = 0x01 | 0*0x02 | 0*0x03 | 0*0x04 | 0*0x08 | 0x10 | 0x20;
   boss.act.currentAnimation = 0;
   boss.act.startOfAnimations = 5;
+  boss.act.isSprite = false;
+  boss.act.hurtFlash = 0;
 
   randomizeParticle(singleBricks, brickSpeed, 0, 0);
   // enable PPU rendeing (turn on screen)
