@@ -850,6 +850,32 @@ void updateMetaSprites(MetaActor * actor)
   updateMetaSprite(actor->act.attribute, MetaTable[actor->act.currentAnimation]);
 }
 
+int detectAllCollisions(Actor * antagonist, int distX, int distY)
+{
+  //distY & distX = 16 if you want a PURE overlap
+  int i = 0;
+  for(i = 0; i < NumActors; i++)
+  {
+    Actor * act = allActors[i];
+    if(act->alive > 0)
+    {
+      if((act->boolean & 0x20) && !(antagonist->boolean & 0x40) )
+      {
+        //if this actor is blockable, and antagonist is not currently blocked
+        int returnValue = spriteCollision(antagonist, act, distX, distY); //stictly anyoverlapping
+        if(returnValue >= 0x30)
+        {
+          //means we found a blocking hit...
+          antagonist->boolean |= 0x40;
+          act->boolean |= 0x40;
+          return i;
+        }
+      }
+    }
+  }
+  return -1;
+}
+
 char updateActor(Actor * actor, char cur_oam)
 {
   int i = 0;
@@ -863,6 +889,12 @@ char updateActor(Actor * actor, char cur_oam)
   byte attacking = (actor->boolean & 0x04) >> 2;
   byte isPlayer = (actor->boolean & 0x08) >> 3;
   byte isBoss = (actor->boolean & 0x10) >> 4;
+  byte isBlockable = (actor->boolean & 0x20) >> 5;
+  byte isBlocked = (actor->boolean & 0x40) >> 6;
+
+  int noBlocksAbove;
+  byte jumping;
+  byte breaking;
 
   //
   if(isPlayer)
@@ -879,10 +911,17 @@ char updateActor(Actor * actor, char cur_oam)
 
     if(!isPlayer && actor->hurtFlash == 0)
     {
+      int dist = 16;
       //set pad_result here to simulate input for other entities
       pad_result = 0;
-      
-      if(absVal(actor->x - player.act.x) > 16)
+
+      if(isBoss)
+      {
+        dist = 128;
+      }
+
+
+      if(absVal(actor->x - player.act.x) > dist) // && player.act.hurtFlash <= 0
       {
         if(actor->x < player.act.x)
         {
@@ -893,9 +932,9 @@ char updateActor(Actor * actor, char cur_oam)
           pad_result |= 0x40;
         }
       }
-      
+
       //go toward player basic script
-      
+
       if(isBoss)
       {
         if(bossNumber == 0)
@@ -905,14 +944,30 @@ char updateActor(Actor * actor, char cur_oam)
           {
             pad_result &= 0x3F;
           }
+
+          //continue input
+          if(boss.act.dx < 0)
+          {
+            pad_result |= 0x40;
+
+          }
+          else if(boss.act.dx > 0)
+          {
+            pad_result |= 0x80;
+          }
+          
+          if(actor->grounded == true && actor->dx == 0)
+          {
+            pad_result |= 0x10;
+          }
         }
       }
     }
 
     //input from trackpad!
-    
+
     actor->dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6);
-    
+
     if((pad_result & 0x80)>>7 && lastFacingRight == false)
     {
       actor->boolean |= 0x02;
@@ -933,7 +988,67 @@ char updateActor(Actor * actor, char cur_oam)
       breaking = pad_result & 0x04;
       noBlocksAbove = aboveOrBellowPlayer(actor->x, actor->y, 1, true, lastFacingRight, 0);
 
-      if(breaking != 0 || player.act.animationTimer != 0 && attacking || shift != 0)
+      actor->attribute = (actor->attribute & 0xBF) | (!lastFacingRight  << 6);
+
+      if((res & 0x0C) != 0 && actor->dx > 0)
+      {
+        //player.act.dx = -1;
+        actor->dx = 0;
+      }
+      if((res & 0x03) != 0 && actor->dx < 0)
+      {
+        //player.act.dx = 1;
+        actor->dx = 0;
+        actor->x -= (actor->x % 8) > 0;
+
+      }
+
+      res = 0;
+
+      for(i = 0; i < 6; i++)
+      {
+
+        if(i >= 4 && actor->dy == 0)
+        {
+          groundBlock[i] = 0;
+        }
+        else
+        {
+          if(!(actor->dy > 0 && playerInAir) && (i == 2 || i == 3))
+          {
+            groundBlock[i] = 0;
+          }
+          else if(! (actor->dy * actor->jumpSpeed >= 8) && (i == 4 || i == 5))
+          {
+            groundBlock[i] = 0;
+          }
+          else
+          {
+            groundBlock[i] = checkGround((actor->x/8) + (i%2), ((actor->y)/8)+2 + (i/2), 1);
+          }
+
+        }
+        res = res | groundBlock[i];
+      }
+
+      if(res != 0)
+      {
+        actor->grounded = true;
+      }
+      else
+      {
+        actor->grounded = false;
+        if(actor->grounded == false && playerInAir == false)
+        {
+          //start falling! we walk off a block and dont jump
+          actor->jumpTimer = MAX_JUMP/2;
+          actor->boolean |= 0x01;
+          playerInAir = actor->boolean&0x01;
+          actor->fallTimer = 0;
+        }
+      }
+
+      if(breaking != 0 || player.act.animationTimer != 0 && attacking && isPlayer || shift != 0)
       {
         jumping = 0;
         //cannot jump & break @ same time
@@ -969,200 +1084,8 @@ char updateActor(Actor * actor, char cur_oam)
       }
     }
 
-    actor->attribute = (actor->attribute & 0xBF) | (!lastFacingRight  << 6);
-
-    if((res & 0x0C) != 0 && actor->dx > 0)
-    {
-      //player.act.dx = -1;
-      actor->dx = 0;
-    }
-    if((res & 0x03) != 0 && actor->dx < 0)
-    {
-      //player.act.dx = 1;
-      actor->dx = 0;
-      actor->x -= (actor->x % 8) > 0;
-    }
-
-    res = 0;
-
-    for(i = 0; i < 6; i++)
-    {
-
-      if(i >= 4 && actor->dy == 0)
-      {
-        groundBlock[i] = 0;
-      }
-      else
-      {
-        if(!(actor->dy > 0 && playerInAir) && (i == 2 || i == 3))
-        {
-          groundBlock[i] = 0;
-        }
-        else if(! (actor->dy * actor->jumpSpeed >= 8) && (i == 4 || i == 5))
-        {
-          groundBlock[i] = 0;
-        }
-        else
-        {
-          groundBlock[i] = checkGround((actor->x/8) + (i%2), ((actor->y)/8)+2 + (i/2), 1);
-        }
-
-      }
-      res = res | groundBlock[i];
-    }
-
-    if(res != 0)
-    {
-      actor->grounded = true;
-    }
-    else
-    {
-      actor->grounded = false;
-      if(actor->grounded == false && playerInAir == false)
-      {
-        //start falling! we walk off a block and dont jump
-        actor->jumpTimer = MAX_JUMP/2;
-        actor->boolean |= 0x01;
-        playerInAir = actor->boolean&0x01;
-        actor->fallTimer = 0;
-      }
-    }
-
-    //dont let boss & player collide
-    if(boss.act.hurtFlash == 0 && isPlayer)
-    {
-      //int returnVal = metaSpriteCollision(&player, &boss, 24, 24);
-      int returnVal = spriteCollision(&player.act, &boss.act, 30, 24);
-      if(returnVal >= 0x03  && boss.act.alive)
-      {
-        if(player.act.dx > 0 && boss.act.x > player.act.x || actor->dx < 0 && boss.act.x < player.act.x)
-        {
-          player.act.dx = 0;
-        }
-
-        //allows player to stand on boss
-        if(returnVal == 0x03)
-        {
-          player.act.dy = 0;
-          player.act.boolean = player.act.boolean & 0xFE;
-          playerInAir = player.act.boolean&0x01;
-          player.act.jumpTimer = 0;
-          player.act.grounded = true;
-        }
-        if(returnVal >= 0x03)
-        {
-          //if the chain chomp is facing player
-          if(attacking == false && actor->hurtFlash == 0 && ( ((boss.act.attribute & 0x40) && player.act.x <= boss.act.x ) || (!(boss.act.attribute & 0x40) && player.act.x >= boss.act.x )))
-          {
-            attacking = true;
-            actor->boolean |= 0x04;
-            
-            player.act.hurtFlash += 10;
-
-            change |= 0x30;
-
-            player.act.dy = -5;
-
-            if(boss.act.x > player.act.x)
-            {
-              player.act.dx = -10;
-            }
-            else
-            {
-              player.act.dx = 10;
-            }
-          }
-        }
-      }
-      
-      //extended reach for player to hit
-      returnVal = returnVal | spriteCollision(&player.act, &boss.act, 45, 24);
-      if(returnVal >= 0x03)
-      {
-        if(breaking)
-        {
-          //only hurt boss when swinging sword
-          boss.act.hurtFlash += 10;
-
-          //player only does one "hit" at a time
-          boss.act.alive -=1;
-
-          boss.act.dy = -3;
-
-          if(boss.act.x < player.act.x)
-          {
-            boss.act.dx = -20;
-          }
-          else
-          {
-            boss.act.dx = 20;
-          }
-        }
-
-      }
-    }
-
-    if(actor->grounded && playerInAir)
-    {
-
-      int itemY = 0;
-
-      if((groundBlock[0] | groundBlock[1]) && ! (groundBlock[2] | groundBlock[3]))
-      {
-        itemY = 0;
-      }
-      else
-      {
-        itemY = 1;
-      }
-
-      actor->y = ((actor->y/8) + itemY)*8;
-
-      actor->dy = 0;
-
-      actor->boolean = actor->boolean & 0xFE;
-      playerInAir = actor->boolean&0x01;
-      //player.act.grounded = false;
-      actor->jumpTimer = 0;
-
-    }
-
-
-    if(actor->jumpTimer != MAX_JUMP-1 && !playerInAir)
-    {
-      if(actor->grounded == true && noBlocksAbove == 0 && jumping && actor->hurtFlash == 0)
-      {
-        //if grounded and you try to jump...
-        actor->jumpTimer = 0;
-        actor->dy = jumpTable[actor->jumpTimer];
-        actor->jumpTimer++;
-        actor->boolean |= 0x01;
-        playerInAir = actor->boolean&0x01;
-        actor->fallTimer = 0;
-      }
-
-    }
-
-
-    if(playerInAir && !actor->grounded)
-    {
-
-      if(actor->fallTimer == 0)
-      {
-
-        //going up or down in the air
-        actor->dy = jumpTable[actor->jumpTimer];
-        if(actor->jumpTimer != MAX_JUMP-1)
-          actor->jumpTimer++;
-      }
-
-      actor->fallTimer++;
-      actor->fallTimer = actor->fallTimer % timeBetweenFall;
-
-    }
-
     //player only behavior
-    if(actor->hurtFlash == 0 && isPlayer)
+    if(actor->hurtFlash == 0)
     {
       byte offset = 1;
       int upOffset = 0;
@@ -1171,35 +1094,40 @@ char updateActor(Actor * actor, char cur_oam)
       {
         offset = 0; //fixes bug where you couldnt break blocks on your left if you were touching them
       }
-      if(Up_Down == 0x01)
+      if(isPlayer)
       {
-        // up
-        upOffset = 1;
-      }
-      else if(Up_Down == 0x02)
-      {
-        // down
-        upOffset = -1;
-      }
-      else
-      {
-        upOffset = 0;
+        if(Up_Down == 0x01)
+        {
+          // up
+          upOffset = 1;
+        }
+        else if(Up_Down == 0x02)
+        {
+          // down
+          upOffset = -1;
+        }
+        else
+        {
+          upOffset = 0;
+        }
       }
       setSelectedPosition(actor->x, actor->y, upOffset, lastFacingRight, offset, 0);
 
-      if(attacking == false)
+      //only players & boses can break blocks
+      if(attacking == false && isPlayer || isBoss)
       {
         char newBlock = 0x0D;
 
         breakBlock = searchPlayer(actor->x, actor->y + (upOffset*8), 0, lastFacingRight, offset);
         //1101
+
         if(breaking)
         {
           attacking = true;
           actor->boolean |= 0x04;
           actor->animationTimer = 0;
         }
-        if((breakBlock != 0) && breaking || selectedPosition[2] != 0 && breaking)
+        if((breakBlock != 0) && (breaking) || selectedPosition[2] != 0 && (breaking) || isBoss)
         {
 
           int itemX, itemY, collision;
@@ -1249,7 +1177,18 @@ char updateActor(Actor * actor, char cur_oam)
             }
             else
             {
-              suitableOption = false; 
+              if(selectedPosition[2] != 0)
+              {
+                itemX = selectedPosition[0];
+                itemY = selectedPosition[1];
+                
+              }
+              else
+              {
+                suitableOption = false;
+              }
+              
+               
             }
           }
 
@@ -1318,8 +1257,10 @@ char updateActor(Actor * actor, char cur_oam)
 
               updateScreen(itemX, itemY, block, 1);
 
-              change |= 0x02;
-
+              if(isPlayer)
+              {
+                change |= 0x02;
+              }
               numActive = NUM_BRICKS;
 
               for(i = 0; i < numActive; i++)
@@ -1338,7 +1279,7 @@ char updateActor(Actor * actor, char cur_oam)
       //placing blocks
 
 
-      if((pad_result&0x08)>>3 && numBlocks > 0 && player.act.hurtFlash == 0)
+      if((pad_result&0x08)>>3 && numBlocks > 0 && actor->hurtFlash == 0)
       {
         int deltaX = 0;
         int deltaY = 0;
@@ -1372,9 +1313,10 @@ char updateActor(Actor * actor, char cur_oam)
           {
             char block[1];
             block[0] = playerPlaceBlock;
-
-            change |= 0x01;
-
+            if(isPlayer)
+            {
+              change |= 0x01;
+            }
             updateScreen(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, block, 1);
 
             setGround(selectedPosition[0] + deltaX, selectedPosition[1]+deltaY, 0x03);
@@ -1389,7 +1331,7 @@ char updateActor(Actor * actor, char cur_oam)
       }
 
 
-      if(boss.act.alive <= 0)
+      if(boss.act.alive <= 0 && isPlayer)
       {
         //makes stairs go to next level!
         for(i = 0; i < numDoors; i++)
@@ -1412,8 +1354,147 @@ char updateActor(Actor * actor, char cur_oam)
       }
 
     }
+
+
+
+    //dont let boss & player collide
+    if(boss.act.hurtFlash == 0 && isPlayer)
+    {
+      //int returnVal = metaSpriteCollision(&player, &boss, 24, 24);
+      int returnVal = spriteCollision(&player.act, &boss.act, 30, 24);
+      if(returnVal >= 0x03  && boss.act.alive)
+      {
+        if(player.act.dx > 0 && boss.act.x > player.act.x || actor->dx < 0 && boss.act.x < player.act.x)
+        {
+          player.act.dx = 0;
+        }
+
+        //allows player to stand on boss
+        if(returnVal == 0x03)
+        {
+          player.act.dy = 0;
+          player.act.boolean = player.act.boolean & 0xFE;
+          playerInAir = player.act.boolean&0x01;
+          player.act.jumpTimer = 0;
+          player.act.grounded = true;
+        }
+        if(returnVal >= 0x03)
+        {
+          //if the chain chomp is facing player
+          if(attacking == false && boss.act.hurtFlash == 0 && ( ((boss.act.attribute & 0x40) && player.act.x <= boss.act.x ) || (!(boss.act.attribute & 0x40) && player.act.x >= boss.act.x )))
+          {
+            //attacking = true;
+            //breaking = true;
+            //set boss attacking to true
+            boss.act.boolean |= 0x04;
+
+            player.act.hurtFlash += 20;
+
+            change |= 0x30;
+
+            player.act.dy = -5;
+
+            if(boss.act.x > player.act.x)
+            {
+              player.act.dx = -30;
+            }
+            else
+            {
+              player.act.dx = 30;
+            }
+          }
+        }
+      }
+
+      //extended reach for player to hit
+      returnVal = returnVal | spriteCollision(&player.act, &boss.act, 30, 24);
+      if(returnVal >= 0x03)
+      {
+        if(breaking)
+        {
+          //only hurt boss when swinging sword
+          boss.act.hurtFlash += 6;
+
+          //player only does one "hit" at a time
+          if(boss.act.alive > 0)
+            boss.act.alive --;
+
+          boss.act.dy = -2;
+
+          if(boss.act.x < player.act.x)
+          {
+            boss.act.dx = -10;
+          }
+          else
+          {
+            boss.act.dx = 10;
+          }
+        }
+
+      }
+    }
+
+    if(actor->grounded && playerInAir)
+    {
+
+      int itemY = 0;
+
+      if((groundBlock[0] | groundBlock[1]) && ! (groundBlock[2] | groundBlock[3]))
+      {
+        itemY = 0;
+      }
+      else
+      {
+        itemY = 1;
+      }
+
+      actor->y = ((actor->y/8) + itemY)*8;
+
+      actor->dy = 0;
+
+      actor->boolean = actor->boolean & 0xFE;
+      playerInAir = actor->boolean&0x01;
+      //player.act.grounded = false;
+      actor->jumpTimer = 0;
+
+    }
+
+
+    if(actor->jumpTimer != MAX_JUMP-1 && !playerInAir)
+    {
+      if(actor->grounded == true && noBlocksAbove == 0 && jumping && actor->hurtFlash == 0)
+      {
+        //if grounded and you try to jump...
+        actor->jumpTimer = 0;
+        actor->dy = jumpTable[actor->jumpTimer];
+        actor->jumpTimer++;
+        actor->boolean |= 0x01;
+        playerInAir = actor->boolean&0x01;
+        actor->fallTimer = 0;
+      }
+
+    }
+
+
+    if(playerInAir && !actor->grounded)
+    {
+
+      if(actor->fallTimer == 0)
+      {
+
+        //going up or down in the air
+        actor->dy = jumpTable[actor->jumpTimer];
+        if(actor->jumpTimer != MAX_JUMP-1)
+          actor->jumpTimer++;
+      }
+
+      actor->fallTimer++;
+      actor->fallTimer = actor->fallTimer % timeBetweenFall;
+
+    }
+
   }
-  
+
   //make them flash when hurt
   if(actor->hurtFlash != 0)
   {
@@ -1425,7 +1506,7 @@ char updateActor(Actor * actor, char cur_oam)
   {
     actor->attribute = !(0 & 0x03) | actor->attribute & 0xFC;
   }
-  
+
 
   {
     //animate the player!
@@ -1495,14 +1576,36 @@ char updateActor(Actor * actor, char cur_oam)
     }
 
   }
+  {
+    int index = detectAllCollisions(actor, 16, 16);
+    if(index != -1)
+    {
+      //check to see if you are going toward them or away
+      Actor * antagonist = allActors[index];
+      if(actor->dx < 0 && antagonist->x <= actor->x || actor->dx > 0 && antagonist->x >= actor->x)
+      {
+        actor->dx = 0;
+      }
+      if(actor->dy < 0 && antagonist->y <= actor->y || actor->dy > 0 && antagonist->y >= actor->y)
+      {
+        actor->dy = 0;
+      }
+    }
+  }
 
   if(!isPlayer)
   {
     //player is updated in scroll
+    byte temp = actor->x;
+    
     actor->x += actor->dx * actor->moveSpeed;
     actor->y += actor->dy * actor->jumpSpeed;
     
-    actor->dx = 0;
+    if(absVal(temp - actor->x) <= 1)
+    {
+      actor->dx = 0;
+    }
+    //actor->dx = 0;
   }
 
   return cur_oam;
@@ -1548,6 +1651,12 @@ void main(void) {
   MetaTable[8] = ChainChomp_stand;		//jump
   MetaTable[9] = ChainChomp_stand;		//run
 
+  //put all actors here!
+  allActors[0] = &player.act;
+  allMetaActors[0] = &player;
+  allActors[1] = &boss.act;
+  allMetaActors[1] = &boss;
+
   pal_all(PALETTE);// generally before game loop (in main)
 
   player.act.x = 8*1;
@@ -1560,20 +1669,20 @@ void main(void) {
   player.act.moveSpeed = 1;
   player.act.jumpSpeed = 4;
   player.act.grounded = true;
-  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER, 0x10 = isBoss
-  player.act.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04 | 0x08 | 0*0x10;
+  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER, 0x10 = isBoss, 0x20 = is blockable
+  player.act.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04 | 0x08 | 0*0x10 | 0x20;
   player.act.currentAnimation = 0;
   player.act.startOfAnimations = 0;
 
   boss.act.alive = 0;
-  boss.act.moveSpeed = 6;
+  boss.act.moveSpeed = 12;
   boss.act.jumpSpeed = 2;
   boss.act.grounded = true;
   boss.act.dx = 0;
   boss.act.dy = 0;
   boss.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
-  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER, 0x10 = isBoss
-  boss.act.boolean = 0x01 | 0*0x02 | 0*0x03 | 0*0x04 | 0*0x08 | 0x10;
+  //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER, 0x10 = isBoss, 0x20 = is blockable
+  boss.act.boolean = 0x01 | 0*0x02 | 0*0x03 | 0*0x04 | 0*0x08 | 0x10 | 0x20;
   boss.act.currentAnimation = 0;
   boss.act.startOfAnimations = 5;
 
@@ -1627,14 +1736,42 @@ void main(void) {
           boss.act.currentAnimation = 0;
           boss.act.startOfAnimations = 5;
           //seettings for world 1 boss
+
         }
       }
 
       //update every actor...
+      for(i = 0; i < numOfMetaSprites; i++)
+      {
+        //since i = 0 is alwyas player...
+        if(allMetaActors[i]->act.alive > 0 || i == 0)
+        {
+          cur_oam = updateMetaActor(allMetaActors[i], cur_oam);
+
+          if(i == 0 || i == 1)
+          {
+            //display reticles
+            cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
+          }
+
+        }
+      }
+      /*
       cur_oam = updateMetaActor(&player, cur_oam);
       //selection reticle
       cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
       cur_oam = updateMetaActor(&boss, cur_oam);
+      //selection reticle
+      cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2]+2, cur_oam);
+      */
+      for(i = 0; i < numOfSpriteActors; i++)
+      {
+        if(allSpriteActors[i]->act.alive > 0)
+        {
+          cur_oam = updateActor(&allSpriteActors[i]->act, cur_oam);
+        }
+
+      }
 
       //update particles!
       if(numActive)
@@ -1669,11 +1806,31 @@ void main(void) {
 
 
     //render all actors!
+    /*
     cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, MetaTable[player.act.currentAnimation]);
 
     if(boss.act.alive > 0)
     {
       cur_oam = oam_meta_spr(boss.act.x, boss.act.y, cur_oam, MetaTable[boss.act.currentAnimation]);
+    }
+    */
+    for(i = 0; i < numOfMetaSprites; i++)
+    {
+      //since i = 0 is alwyas player...
+      if(allMetaActors[i]->act.alive > 0 || i == 0)
+      {
+        cur_oam = oam_meta_spr(allMetaActors[i]->act.x, allMetaActors[i]->act.y, cur_oam, MetaTable[allMetaActors[i]->act.currentAnimation]);;
+
+      }
+    }
+
+    for(i = 0; i < numOfSpriteActors; i++)
+    {
+      if(allSpriteActors[i]->act.alive > 0)
+      {
+        cur_oam = oam_spr(allSpriteActors[i]->act.x, allSpriteActors[i]->act.y, allSpriteActors[i]->sprite , allSpriteActors[i]->act.attribute, cur_oam);
+      }
+
     }
 
 

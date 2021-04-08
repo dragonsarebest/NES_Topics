@@ -81,6 +81,16 @@ DEF_METASPRITE_2x2(ChainChomp_stand, 0xF8, 0);
 MetaActor player;
 MetaActor boss;
 
+//since a metaactor takes up 4 of our max 60 num sprites
+#define NumActors 60 - (3*NUM_DIFF_METAACTORS) - NUM_BRICKS
+Actor * allActors[NumActors];
+
+MetaActor * allMetaActors[numOfMetaSprites];
+
+#define numOfSpriteActors NumActors-numOfMetaSprites
+SpriteActor * allSpriteActors[numOfSpriteActors];
+
+
 byte bossSpawnedTracker = 0;
 byte spawnBoss = false;
 byte bossNumber = 0;
@@ -90,11 +100,9 @@ byte bossNumber = 0;
 byte Up_Down = 0; //minning up or down, or straight ahead
 byte lastTouch = 0; //gives the player leeway - 10 frames to let go of shift, otherwise it will continually register
 short digTimer = 0; //player only timers
-short digWait = 5;
+short digWait = 3;
 byte change = 0;
-int noBlocksAbove;
-byte jumping;
-byte breaking;
+
 //player variables
 
 byte timeBetweenFall = 2; //how long to hold falling animation
