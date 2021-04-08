@@ -876,7 +876,7 @@ int detectAllCollisions(Actor * antagonist, int distX, int distY)
   return -1;
 }
 
-char updateActor(Actor * actor, char cur_oam)
+char updateActor(Actor * actor, char cur_oam, int index)
 {
   int i = 0;
   int res = 0;
@@ -900,15 +900,59 @@ char updateActor(Actor * actor, char cur_oam)
   byte jumping;
   byte breaking;
 
+  
+  if(actor->isSprite && isBlockable == false)
+  {
+    //dont update these as hard
+    if(checkGround(actor->x/8,actor->y/8 + 1, 1) == 0)
+    {
+      actor->dy = 1;
+    }
+    else
+    {
+      actor->dy = -1;
+    }
+    
+    actor->x += actor->dx * actor->moveSpeed;
+    actor->y += actor->dy * actor->jumpSpeed;
+    
+    if(actor->isSprite)
+    {
+      if(index >= 0 && index <= 5) 
+      {
+        actor->attribute = boss.act.attribute;
+        
+        if(actor->attribute & 0x04)
+        {
+          actor->boolean |= 0x02;
+        }
+        else
+        {
+          actor->boolean &= 0xFD;
+        }
+        
+        lastFacingRight = (actor->boolean & 0x02) >> 1;
+        
+       if(index == 0)
+       {
+         actor->x = boss.act.x + 16 * -1*(lastFacingRight);
+         actor->y = boss.act.y + 8;
+       }
+      }
+    }
+    
+    return cur_oam;
+  }
+  
   //
-  if(isPlayer)
+  //if(isPlayer)
   {
     noBlocksAbove = 0;
     jumping = 0;
     breaking = 0;
     //player only variables
   }
-  else
+  if(!isPlayer)
   {
     pad_result = 0;
   }
@@ -1142,7 +1186,7 @@ char updateActor(Actor * actor, char cur_oam)
           actor->boolean |= 0x04;
           actor->animationTimer = 0;
         }
-        if((breakBlock != 0) && (breaking) || selectedPosition[2] != 0 && (breaking) || isBoss)
+        if((breakBlock != 0) && (breaking) || selectedPosition[2] != 0 && (breaking))
         {
 
           int itemX, itemY, collision;
@@ -1632,16 +1676,16 @@ char updateActor(Actor * actor, char cur_oam)
   return cur_oam;
 }
 
-char updateSpriteActors(SpriteActor * actor, char cur_oam)
+char updateSpriteActors(SpriteActor * actor, char cur_oam, int index)
 {
-  cur_oam = updateActor(&actor->act, cur_oam);
+  cur_oam = updateActor(&actor->act, cur_oam, index);
   //updateSprites(actor);
   return cur_oam;
 }
 
-char updateMetaActor(MetaActor * actor, char cur_oam)
+char updateMetaActor(MetaActor * actor, char cur_oam, int index)
 {
-  cur_oam = updateActor(&actor->act, cur_oam);
+  cur_oam = updateActor(&actor->act, cur_oam, index);
   updateMetaSprites(actor);
   return cur_oam;
   //return cur_oam = oam_meta_spr(actor->act.x, actor->act.y, cur_oam, PlayerMetaSprite);
@@ -1679,6 +1723,11 @@ void main(void) {
   allMetaActors[1] = &boss;
   
   allSpriteActors[0] = &chain;
+  allSpriteActors[1] = &chain;
+  allSpriteActors[2] = &chain;
+  allSpriteActors[3] = &chain;
+  allSpriteActors[4] = &chain;
+  allSpriteActors[5] = &chain;
   
 
   pal_all(PALETTE);// generally before game loop (in main)
@@ -1691,10 +1740,10 @@ void main(void) {
   chain.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
   chain.act.alive = 2; // hit points
   chain.act.moveSpeed = 1;
-  chain.act.jumpSpeed = 4;
+  chain.act.jumpSpeed = 2;
   chain.act.grounded = true;
   //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x08 = IS_PLAYER, 0x10 = isBoss, 0x20 = is blockable, 0x80 = tracks
-  chain.act.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04 | 0*0x08 | 0*0x10 | 0x20;
+  chain.act.boolean = 0x01 | 0x02 | 0*0x03 | 0*0x04 | 0*0x08 | 0*0x10 | 0*0x20;
   chain.act.isSprite = true;
   chain.act.hurtFlash = 0;
   
@@ -1723,7 +1772,7 @@ void main(void) {
   boss.act.dy = 0;
   boss.act.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
   //0x01 = playerInAir,0x02 = lastFacingRight, 0x03 = isWalking, 0x04 = is attacking, 0x05 = IS_PLAYER, 0x10 = isBoss, 0x20 = is blockable
-  boss.act.boolean = 0x01 | 0*0x02 | 0*0x03 | 0*0x04 | 0*0x08 | 0x10 | 0x20;
+  boss.act.boolean = 0x01 | 0*0x02 | 0*0x03 | 0*0x04 | 0*0x08 | 0x10 | 0x20 | 0x80;
   boss.act.currentAnimation = 0;
   boss.act.startOfAnimations = 5;
   boss.act.isSprite = false;
@@ -1758,7 +1807,7 @@ void main(void) {
       if(spawnBoss)
       {
         //always first thing to run once a new world is loaded
-
+        
         updatePlayerHealth(0, &player);
         updateBombBlockLives(0, 0x01);
         updateBombBlockLives(0, 0x02);
@@ -1789,7 +1838,7 @@ void main(void) {
         //since i = 0 is alwyas player...
         if(allMetaActors[i]->act.alive > 0 || i == 0)
         {
-          cur_oam = updateMetaActor(allMetaActors[i], cur_oam);
+          cur_oam = updateMetaActor(allMetaActors[i], cur_oam, i);
 
           if(i == 0 || i == 1)
           {
@@ -1811,7 +1860,7 @@ void main(void) {
       {
         if(allSpriteActors[i]->act.alive > 0)
         {
-          cur_oam = updateActor(&allSpriteActors[i]->act, cur_oam);
+          cur_oam = updateActor(&allSpriteActors[i]->act, cur_oam, i);
         }
 
       }
