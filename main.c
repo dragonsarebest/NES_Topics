@@ -2040,7 +2040,7 @@ void main(void) {
           boss.attribute = 1;
           boss.x = 28*8;
           boss.y =  25*8;
-          boss.alive = 25;
+          boss.alive = 20;
           boss.moveSpeed = 2;
           boss.jumpSpeed = 4;
           boss.currentAnimation = 0;
@@ -2155,7 +2155,7 @@ void main(void) {
 
     //scroll world
     
-    if(boss.alive <= 0 && justKilledBoss)
+    if(boss.alive <= 0 && deathTimer > 0 && deathTimer < 0xF)
     {
       boss.attribute = !(boss.attribute & 0x03) | boss.attribute & 0xFC;
       cur_oam = oam_meta_spr(boss.x, boss.y, cur_oam, MetaTable[boss.startOfAnimations]);
