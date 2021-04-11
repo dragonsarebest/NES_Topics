@@ -378,49 +378,89 @@ byte loadWorld()
 }
 
 //functions defined here
-void updateMetaSprite(unsigned char attribute, unsigned char * meta)
+void updateMetaSprite(unsigned char attribute, unsigned char * meta, byte normal)
 {
   //palette, is behind, flip_hor, flip_vert
   //1 | (0 << 5) | (1 << 6) | (0 << 7);
   //0x3, 0x20, 0x40, 0x80 ^
-
-  meta[3] = attribute;
-  meta[7] = attribute;
-  meta[11] = attribute;
-  meta[15] = attribute;
-
-  if(((attribute&0x40) >> 6) == 0)
+  if(normal)
   {
-    //flip horizontally
-    meta[0] = 0;
-    meta[4] = 0;
-    meta[8] = 8;
-    meta[12] = 8;
+    meta[3] = attribute;
+    meta[7] = attribute;
+    meta[11] = attribute;
+    meta[15] = attribute;
+
+    if(((attribute&0x40) >> 6) == 0)
+    {
+      //flip horizontally
+      meta[0] = 0;
+      meta[4] = 0;
+      meta[8] = 8;
+      meta[12] = 8;
+    }
+    else
+    {
+      //flip horizontally the other way
+      meta[0] = 8;
+      meta[4] = 8;
+      meta[8] = 0;
+      meta[12] = 0;
+    }
+
+    if(((attribute&0x80) >> 7) == 0)
+    {
+      //flip vertically
+      meta[1] = 0;
+      meta[5] = 8;
+      meta[9] = 0;
+      meta[13] = 8;
+    }
+    else
+    {
+      //flip vertically the other way
+      meta[1] = 8;
+      meta[5] = 0;
+      meta[9] = 8;
+      meta[13] = 0;
+    }
   }
   else
   {
-    //flip horizontally the other way
-    meta[0] = 8;
-    meta[4] = 8;
-    meta[8] = 0;
-    meta[12] = 0;
-  }
+    //0x80
+    if((attribute & 0x80) == 0)
+    {
+      meta[3] = attribute | 0x80;
+      meta[7] = attribute;
+      meta[11] = attribute | 0x80;
+      meta[15] = attribute;
+    }
+    else
+    {
+      meta[3] = attribute & 0x7F;
+      meta[7] = attribute;
+      meta[11] = attribute & 0x7F;
+      meta[15] = attribute;
+    }
 
-  if(((attribute&0x80) >> 7) == 0)
-  {
-    //flip vertically
-    meta[1] = 0;
-    meta[5] = 8;
-    meta[9] = 0;
-    meta[13] = 8;
-  }
-  else
-  {
-    //flip vertically the other way
-    meta[1] = 8;
-    meta[5] = 0;
-    meta[9] = 8;
-    meta[13] = 0;
+
+    //is a long metasprite
+    if(((attribute&0x40) >> 6) == 0)
+    {
+      //flip horizontally
+      meta[0] = 0;
+      meta[4] = 8;
+      meta[8] = 16;
+      meta[12] = 24;
+    }
+    else
+    {
+      //flip horizontally the other way
+      meta[0] = 24;
+      meta[4] = 16;
+      meta[8] = 8;
+      meta[12] = 0;
+    }
+
   }
 }
 
@@ -465,15 +505,6 @@ void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
 
     singleBricks[i] = bck;
   }
-}
-
-void updatePlayerSprites()
-{
-  updateMetaSprite(player.attribute, PlayerMetaSprite);
-  updateMetaSprite(player.attribute, PlayerMetaSprite_Run);
-  updateMetaSprite(player.attribute, PlayerMetaSprite_Attack_1);
-  updateMetaSprite(player.attribute, PlayerMetaSprite_Attack_2);
-  updateMetaSprite(player.attribute, PlayerMetaSprite_Jump);
 }
 
 
@@ -830,17 +861,6 @@ void setWorldNumber(byte num)
   spawnBoss = true;
 }
 
-void updateBossMetaSprites()
-{
-  if(bossNumber == 0)
-  {
-    updateMetaSprite(boss.attribute, ChainChomp_stand);
-    updateMetaSprite(boss.attribute, ChainChomp_Attack_1);
-    updateMetaSprite(boss.attribute, ChainChomp_Attack_2);
-    updateMetaSprite(boss.attribute, ChainChomp_Jump);
-    updateMetaSprite(boss.attribute, ChainChomp_Run);
-  }
-}
 
 int absVal(int x)
 {
@@ -859,9 +879,9 @@ int spriteCollision(Actor * actor1, Actor * actor2, byte amountX, byte amountY)
   return((diffX <= amountX) * 0x02) | (diffY <= amountY);
 }
 
-void updateMetaSprites(Actor * actor)
+void updateMetaSprites(Actor * actor, byte normal)
 {
-  updateMetaSprite(actor->attribute, MetaTable[actor->currentAnimation]);
+  updateMetaSprite(actor->attribute, MetaTable[actor->currentAnimation], normal);
 }
 
 int detectAllCollisions(Actor * antagonist, int distX, int distY)
@@ -927,9 +947,9 @@ char updateActor(Actor * actor, char cur_oam, int index)
   if(actor->isSprite && isBlockable == false || isBlockable == false && istracking == false && isPlayer == false && isBoss == false)
   {
     //dont update these as hard
-    
+
     index = 0;
-    
+
     if(checkGround(actor->x/8,actor->y/8 + 1, 1) == 0)
     {
       actor->dy = 1;
@@ -941,13 +961,15 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
     actor->x += actor->dx * actor->moveSpeed;
     actor->y += actor->dy * actor->jumpSpeed;
-    
+
     actor->currentAnimation = actor->startOfAnimations;
 
-    /*
-    if(index >= 2 && index <= 7) 
+    if(actor->startOfAnimations == 10)
     {
-      actor->attribute = boss.attribute;
+      //is the chain
+      //actor->attribute = boss.attribute;
+
+      actor->attribute |= boss.attribute & 0x07;
 
       if(actor->attribute & 0x04)
       {
@@ -960,32 +982,53 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
       lastFacingRight = (boss.boolean & 0x02) >> 1;
 
-      if(index == 0)
+      //if(index == 0)
       {
+
+
+
+        //actor->y != boss.y ||
+        if( actor->animationTimer >= 10 && (actor->attribute & 0x80) == 0)
+        {
+          actor->animationTimer = 0;
+          //actor->attribute = 0x80 *( !(actor->attribute&0x80 >> 7)) | (actor->attribute&0x7f) ;
+          actor->attribute |= 0x80;
+        }
+        else if(actor->animationTimer >= 10 && (actor->attribute & 0x80) != 0)
+        {
+          actor->animationTimer = 0;
+          actor->attribute &= 0x7F;
+        }
+
+        actor->y = boss.y + 8;
+
         if(lastFacingRight)
         {
-          actor->x = boss.x - 8;
+          actor->x = boss.x - 31;
+          if(actor->attribute | 0x80)
+          {
+            actor->x++;
+          }
+
         }
         else
         {
-          actor->x = boss.x + 16;
+          actor->x = boss.x + 15;
+          if(actor->attribute | 0x80)
+          {
+            actor->x--;
+          }
         }
 
+        if(actor->attribute | 0x80)
+        {
+          actor->y -= 3;
+        }
 
-        if(actor->y != boss.y)
-        {
-          actor->attribute = (actor->attribute&0x7f) | (0x80 * actor->attribute&0x80);
-        }
-        if(actor->attribute & 0x80)
-        {
-          actor->y = boss.y + 6;
-        }
-        else
-        {
-          actor->y = boss.y + 10;
-        }
+        actor->animationTimer ++;
 
       }
+      /*
       if(index == 1)
       {
         if(lastFacingRight)
@@ -1011,9 +1054,8 @@ char updateActor(Actor * actor, char cur_oam, int index)
           actor->y = lastY + 10;
         }
       }
-    }*/
-
-
+      */
+    }
     return cur_oam;
   }
 
@@ -1845,10 +1887,10 @@ char updateSpriteActors(Actor * actor, char cur_oam, int index)
   return cur_oam;
 }
 
-char updateMetaActor(Actor * actor, char cur_oam, int index)
+char updateMetaActor(Actor * actor, char cur_oam, int index, byte normal)
 {
   cur_oam = updateActor(actor, cur_oam, index);
-  updateMetaSprites(actor);
+  updateMetaSprites(actor, normal);
   return cur_oam;
   //return cur_oam = oam_meta_spr(actor->act.x, actor->act.y, cur_oam, PlayerMetaSprite);
 }
@@ -1885,36 +1927,37 @@ void main(void) {
   MetaTable[7] = ChainChomp_Attack_2;		//attack 2
   MetaTable[8] = ChainChomp_Jump;		//jump
   MetaTable[9] = ChainChomp_Run;		//run
-  
+
   MetaTable[10] = longChain;
+  //MetaTable[0] = longChain;
 
   //put all actors here!
   allActors[0] = &player;
   allActors[1] = &boss;
-  
+
 
   pal_all(PALETTE);// generally before game loop (in main)
 
-  
+
   //chain.currentAnimation = 0x30; //if it is a sprite
-  chain.currentAnimation = 0;
+  chain.currentAnimation = 10;
   chain.startOfAnimations = 10;
-  chain.x = (13+i)*8;
-  chain.y = 13*8;
+  chain.x = 8*8;
+  chain.y = 8*8;
   chain.dx = 0;
   chain.dy = 0;
   chain.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
-  chain.alive = 2; // hit points
+  chain.alive = 0; // hit points
   chain.moveSpeed = 1;
   chain.jumpSpeed = 2;
   chain.grounded = true;
   //0x01 = playerInAir,0x02 = lastFacingRight, 0x04 = isAttacking, 0x08 = is Player, 0x10 = is boss, 0x20 = isBlockable, 0x40 = ISBLOCKED, 0x80 = tracks
   chain.boolean = 0x01 | 0x02;
-  //chain.isSprite = true; //if it is a sprite
+  //chain.isSprite = false; //if it is a sprite
   chain.hurtFlash = 0;
 
   allActors[2] = &chain;
-  
+
 
   player.x = 8*1;
   player.y = 23* 8;
@@ -1997,6 +2040,8 @@ void main(void) {
           boss.currentAnimation = 0;
           boss.startOfAnimations = 5;
           //seettings for world 1 boss
+          
+          chain.alive = 2;
 
         }
       }
@@ -2009,7 +2054,12 @@ void main(void) {
           //since i = 0 is alwyas player...
           if(allActors[i]->alive > 0 || i == 0)
           {
-            cur_oam = updateMetaActor(allActors[i], cur_oam, i);
+            byte normal = true;
+            if(allActors[i]->startOfAnimations == 10)
+            {
+              normal = false; //the chain
+            }
+            cur_oam = updateMetaActor(allActors[i], cur_oam, i, normal);
 
             if(i == 0 || i == 1)
             {
@@ -2036,23 +2086,20 @@ void main(void) {
         {
           if(singleBricks[i].lifetime > 0)
           {
-            cur_oam = oam_spr(singleBricks[i].x, singleBricks[i].y, singleBricks[i].sprite ,singleBricks[i].attribute, cur_oam);
+            singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx;
+            singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy;
+
+
+            if(singleBricks[i].lifetime != 1)
             {
-              singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx;
-              singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy;
-
-
-              if(singleBricks[i].lifetime != 1)
-              {
-                singleBricks[i].lifetime--;
-              }
-              else
-              {
-                singleBricks[i].lifetime = 0;
-                numActive--;
-              }
-
+              singleBricks[i].lifetime--;
             }
+            else
+            {
+              singleBricks[i].lifetime = 0;
+              numActive--;
+            }
+            cur_oam = oam_spr(singleBricks[i].x, singleBricks[i].y, singleBricks[i].sprite ,singleBricks[i].attribute, cur_oam);
           }
         }
       }
@@ -2076,15 +2123,17 @@ void main(void) {
     }
 
 
-    if(boss.alive > 0 && player.animationTimer % 2)
-    {
+    //if(boss.alive > 0 && player.animationTimer % 2)
+    //{
 
-      //char dx[14];
-      //sprintf(dx, "boss_anim: %d", boss.animationTimer);
-      //updateScreen(2, 6, dx, 14);
+    //char dx[14];
+    //sprintf(dx, "boss_anim: %d", boss.animationTimer);
+    //updateScreen(2, 6, dx, 14);
 
-      writeBinary(2,5, boss.boolean);
-    }
+    //writeBinary(2,5, boss.boolean);
+
+    //writeBinary(2,6, chain.boolean);
+    //}
 
     //scroll world
 

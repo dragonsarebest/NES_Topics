@@ -10,12 +10,13 @@
           128}; //128 = number of bits
 
 
+
 //long BOIS
 #define DEF_METASPRITE_4x1(name, code, attribute)\
  unsigned char name[]={\
  	  0,      0,      (code),   attribute, \
           8,      0,      (code),   attribute, \
- 	  16,      0,      (code),   attribute, \
+          16,      0,      (code),   attribute, \
           24,      0,      (code),   attribute, \
           128};
 
@@ -81,7 +82,8 @@ char groundBlock[6];
 //5 metasprites per entity....
 #define NUM_ANIMATIONS 5
 #define NUM_DIFF_METAACTORS 2
-#define numOfMetaSprites NUM_ANIMATIONS*NUM_DIFF_METAACTORS
+#define extraneous 1
+#define numOfMetaSprites (NUM_ANIMATIONS*NUM_DIFF_METAACTORS) +extraneous
 char * MetaTable[numOfMetaSprites];
 
 //DEF_METASPRITE_2x2(PlayerMetaSprite, 0xD8, 0);
