@@ -18,6 +18,16 @@
 
 //#link "vrambuf.c"
 
+/*
+// select current chr bank for sprites, 0..1
+void __fastcall__ bank_spr(unsigned char n);
+
+// select current chr bank for background, 0..1
+void __fastcall__ bank_bg(unsigned char n);
+
+*/
+
+
 word setVRAMAddress(int x, int y, byte setNow )
 {
   word addr;
@@ -1345,22 +1355,22 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
               //outsideHelper = oldBlock;
 
-              if(oldBlock >= 0xC4 && oldBlock <= 0xC7)
+              if(oldBlock >= door && oldBlock <= door+4)
               {
                 int x = itemX, y = itemY, i;
                 //0xFc -> 0xFF
-                newBlock = 0xFc + (oldBlock -  0xC4);
+                newBlock = stairs + (oldBlock -  door);
 
 
-                if(oldBlock == 0xC5)
+                if(oldBlock == door+1)
                 {
                   y--;
                 }
-                if( oldBlock == 0xc6)
+                if( oldBlock == door+2)
                 {
                   x--;
                 }
-                if(oldBlock == 0xc7)
+                if(oldBlock == door+3)
                 {
                   x--;
                   y--;
@@ -1371,6 +1381,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
                   if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
                   {
                     DoorInfo[i]--;
+                    //only need to break one pannel to progress..
                     if(DoorInfo[i] != 4)
                     {
                       UpTo8DoorsOpen = UpTo8DoorsOpen | 1 << i;
@@ -1849,6 +1860,9 @@ void main(void) {
   worldNumber = 0;
   transition = 0x01;
   //default world parameters
+  
+  bank_spr(1);
+  bank_bg(0);
 
   MetaTable[0] = PlayerMetaSprite;		//idle
   MetaTable[1] = PlayerMetaSprite_Attack_1;	//attack 1
