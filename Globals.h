@@ -106,6 +106,7 @@ DEF_METASPRITE_4x1(longChain, 0x30, 0);
 
 Actor player;
 Actor boss;
+Actor chain;
 
 //since a metaactor takes up 4 of our max 60 num sprites
 #define NumActors 60 - (3*NUM_DIFF_METAACTORS) - NUM_BRICKS
@@ -114,6 +115,7 @@ Actor * allActors[NumActors];
 byte bossSpawnedTracker = 0;
 byte spawnBoss = false;
 byte bossNumber = 0;
+byte justKilledBoss = false;
 //byte BossAttacking = false;
 
 //

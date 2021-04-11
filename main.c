@@ -514,6 +514,7 @@ void pal_fade_to(unsigned to)
   while(brightness!=to)
   {
     delay(4);
+
     if(brightness<to) ++brightness; 
     else --brightness;
     pal_bright(brightness);
@@ -971,7 +972,12 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
       actor->attribute |= boss.attribute & 0x04;
       actor->hurtFlash = boss.hurtFlash;
-      
+
+      if(boss.alive <= 0)
+      {
+        actor->alive = 0;
+      }
+
       if(actor->hurtFlash != 0)
       {
         actor->hurtFlash--;
@@ -1040,33 +1046,6 @@ char updateActor(Actor * actor, char cur_oam, int index)
         actor->animationTimer ++;
 
       }
-      /*
-      if(index == 1)
-      {
-        if(lastFacingRight)
-        {
-          actor->x = lastX - 8;
-        }
-        else
-        {
-          actor->x = lastX + 8;
-        }
-
-
-        if(actor->y != lastY)
-        {
-          actor->attribute = (actor->attribute&0x7f) | (0x80 * actor->attribute&0x80);
-        }
-        if(actor->attribute & 0x80)
-        {
-          actor->y = lastY + 6;
-        }
-        else
-        {
-          actor->y = lastY + 10;
-        }
-      }
-      */
     }
     return cur_oam;
   }
@@ -1131,7 +1110,14 @@ char updateActor(Actor * actor, char cur_oam, int index)
           if(actor->grounded == true && actor->dx == 0)
           {
 
-            if(isBlocked)
+            int offset = 0;
+            if(lastFacingRight == false)
+            {
+              offset = 0; //fixes bug where you couldnt break blocks on your left if you were touching them
+            }
+            setSelectedPosition(actor->x, actor->y, 0, lastFacingRight, offset, 0);
+
+            if(selectedPosition[2] != 0)
             {
               pad_result |= 0x04; //breaking
             }
@@ -1623,17 +1609,23 @@ char updateActor(Actor * actor, char cur_oam, int index)
       }
 
       //extended reach for player to hit
-      returnVal = returnVal | spriteCollision(&player, &boss, 30, 24);
+      //returnVal = returnVal | spriteCollision(&player, &boss, 30, 24);
+      returnVal = returnVal | spriteCollision(&player, &chain, 8, 8);
       if(returnVal >= 0x03)
       {
         if(breaking)
         {
           //only hurt boss when swinging sword
-          boss.hurtFlash += 6;
+          boss.hurtFlash += 5;
 
           //player only does one "hit" at a time
           if(boss.alive > 0)
             boss.alive --;
+
+          if(boss.alive <= 0)
+          {
+            justKilledBoss = true;
+          }
 
           boss.dy = -2;
 
@@ -1911,7 +1903,7 @@ void main(void) {
 
   char cur_oam;
   unsigned int i = 0, j = 0;
-  Actor chain;
+  byte deathTimer = 0xF;
 
   worldScrolling = false;
   scrollSwap = !worldScrolling;
@@ -2037,6 +2029,8 @@ void main(void) {
         updateBombBlockLives(0, 0x02);
         updateBombBlockLives(0, 0x03);
 
+        justKilledBoss = false;
+
         spawnBoss = false;
         //get spawn location & which boss here
         if(worldNumber == 1 && (bossSpawnedTracker & 0x01) == 0)
@@ -2046,13 +2040,13 @@ void main(void) {
           boss.attribute = 1;
           boss.x = 28*8;
           boss.y =  25*8;
-          boss.alive = 20;
+          boss.alive = 25;
           boss.moveSpeed = 2;
           boss.jumpSpeed = 4;
           boss.currentAnimation = 0;
           boss.startOfAnimations = 5;
           //seettings for world 1 boss
-          
+
           chain.alive = 2;
 
         }
@@ -2089,8 +2083,8 @@ void main(void) {
           }
         }
       }
-      
-      
+
+
 
 
       //update particles!
@@ -2100,8 +2094,18 @@ void main(void) {
         {
           if(singleBricks[i].lifetime > 0)
           {
-            singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx;
-            singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy;
+            
+            
+            if(boss.alive <= 0 && justKilledBoss && deathTimer > 0)
+            {
+              singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx/deathTimer;
+              singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy/deathTimer;
+            }
+            else
+            {
+              singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx;
+              singleBricks[i].y = singleBricks[i].y + singleBricks[i].dy;
+            }
 
 
             if(singleBricks[i].lifetime != 1)
@@ -2127,7 +2131,7 @@ void main(void) {
       {
         if(allActors[i]->isSprite == false)
         {
-          cur_oam = oam_meta_spr(allActors[i]->x, allActors[i]->y, cur_oam, MetaTable[allActors[i]->currentAnimation]);;
+          cur_oam = oam_meta_spr(allActors[i]->x, allActors[i]->y, cur_oam, MetaTable[allActors[i]->currentAnimation]);
         }
         else
         {
@@ -2150,6 +2154,45 @@ void main(void) {
     //}
 
     //scroll world
+    
+    if(boss.alive <= 0 && justKilledBoss)
+    {
+      boss.attribute = !(boss.attribute & 0x03) | boss.attribute & 0xFC;
+      cur_oam = oam_meta_spr(boss.x, boss.y, cur_oam, MetaTable[boss.startOfAnimations]);
+    }
+
+    if(boss.alive <= 0 && justKilledBoss && deathTimer > 0)
+    {
+      if(deathTimer == 0xF)
+      {
+        //pal_fade_to(2);
+        pal_bright(2);
+      }
+      deathTimer--;
+    }
+    else if(boss.alive <= 0 && justKilledBoss == false && deathTimer == 0)
+    {
+      numActive = NUM_BRICKS;
+
+      for(i = 0; i < numActive; i++)
+      {
+        singleBricks[i].lifetime = brickLifetime;
+        singleBricks[i].x = boss.x-5;
+        singleBricks[i].y = boss.y;
+
+      }
+      
+      pal_fade_to(6);
+      deathTimer = 0xF;
+    }
+
+    if(deathTimer == 0 && justKilledBoss)
+    {
+      justKilledBoss = false;
+    }
+
+    
+
 
     scrollWorld(transition, &player);
 
