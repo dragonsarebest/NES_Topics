@@ -77,24 +77,18 @@ DEF_METASPRITE_2x2(PlayerMetaSprite_Jump, 0xE8, 0);
 DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xDC, 0);
 
 DEF_METASPRITE_2x2(ChainChomp_stand, 0xF8, 0);
-DEF_METASPRITE_2x2(ChainChomp_Attack_1, 0xE0, 0);
-DEF_METASPRITE_2x2(ChainChomp_Attack_2, 0xE4, 0);
-DEF_METASPRITE_2x2(ChainChomp_Jump, 0xE8, 0);
-DEF_METASPRITE_2x2(ChainChomp_Run, 0xDC, 0);
+DEF_METASPRITE_2x2(ChainChomp_Attack_1, 0x104, 0);
+DEF_METASPRITE_2x2(ChainChomp_Attack_2, 0x108, 0);
+DEF_METASPRITE_2x2(ChainChomp_Jump, 0x100, 0);
+DEF_METASPRITE_2x2(ChainChomp_Run, 0xF4, 0);
 
 
-MetaActor player;
-MetaActor boss;
+Actor player;
+Actor boss;
 
 //since a metaactor takes up 4 of our max 60 num sprites
 #define NumActors 60 - (3*NUM_DIFF_METAACTORS) - NUM_BRICKS
 Actor * allActors[NumActors];
-
-MetaActor * allMetaActors[numOfMetaSprites];
-
-#define numOfSpriteActors NumActors-numOfMetaSprites
-SpriteActor * allSpriteActors[numOfSpriteActors];
-
 
 byte bossSpawnedTracker = 0;
 byte spawnBoss = false;

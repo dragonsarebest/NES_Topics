@@ -34,17 +34,3 @@ typedef struct Actor
   char currentAnimation;
   char startOfAnimations;
 } Actor;
-
-typedef struct SpriteActor
-{
-  Actor act;
-  unsigned char sprite;
-} SpriteActor;
-
-typedef struct MetaActor
-{
-  Actor act;
-  unsigned char * metasprite;
-} MetaActor;
-
-
