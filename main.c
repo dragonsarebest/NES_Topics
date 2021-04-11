@@ -885,8 +885,9 @@ char updateActor(Actor * actor, char cur_oam, int index)
   int i = 0;
   int res = 0;
   char breakBlock;
+  
   char pad_result = pad_poll(0) | pad_poll(1);
-
+  
 
   /// 1111 1111, 0x01 = playerInAir,0x02 = lastFacingRight, 0x04 = isAttacking, 0x08 = is Player
   byte playerInAir = (actor->boolean & 0x01);
@@ -907,8 +908,11 @@ char updateActor(Actor * actor, char cur_oam, int index)
   byte breaking;
 
 
-
-
+  if(!isPlayer)
+  {
+    pad_result = 0;
+  }
+  
 
   if(actor->isSprite && isBlockable == false)
   {
