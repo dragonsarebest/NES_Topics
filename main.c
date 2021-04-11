@@ -969,7 +969,19 @@ char updateActor(Actor * actor, char cur_oam, int index)
       //is the chain
       //actor->attribute = boss.attribute;
 
-      actor->attribute |= boss.attribute & 0x07;
+      actor->attribute |= boss.attribute & 0x04;
+      actor->hurtFlash = boss.hurtFlash;
+      
+      if(actor->hurtFlash != 0)
+      {
+        actor->hurtFlash--;
+        if(actor->hurtFlash%2)
+          actor->attribute = !(actor->attribute & 0x03) | actor->attribute & 0xFC;
+      }
+      else
+      {
+        actor->attribute = !(0 & 0x03) | actor->attribute & 0xFC;
+      }
 
       if(actor->attribute & 0x04)
       {
@@ -984,20 +996,20 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
       //if(index == 0)
       {
-
-
-
         //actor->y != boss.y ||
-        if( actor->animationTimer >= 10 && (actor->attribute & 0x80) == 0)
+        if(boss.dx != 0)
         {
-          actor->animationTimer = 0;
-          //actor->attribute = 0x80 *( !(actor->attribute&0x80 >> 7)) | (actor->attribute&0x7f) ;
-          actor->attribute |= 0x80;
-        }
-        else if(actor->animationTimer >= 10 && (actor->attribute & 0x80) != 0)
-        {
-          actor->animationTimer = 0;
-          actor->attribute &= 0x7F;
+          if( actor->animationTimer >= 10 && (actor->attribute & 0x80) == 0)
+          {
+            actor->animationTimer = 0;
+            //actor->attribute = 0x80 *( !(actor->attribute&0x80 >> 7)) | (actor->attribute&0x7f) ;
+            actor->attribute |= 0x80;
+          }
+          else if(actor->animationTimer >= 10 && (actor->attribute & 0x80) != 0)
+          {
+            actor->animationTimer = 0;
+            actor->attribute &= 0x7F;
+          }
         }
 
         actor->y = boss.y + 8;
