@@ -77,6 +77,11 @@ DEF_METASPRITE_2x2(PlayerMetaSprite_Jump, 0xE8, 0);
 DEF_METASPRITE_2x2(PlayerMetaSprite_Run, 0xDC, 0);
 
 DEF_METASPRITE_2x2(ChainChomp_stand, 0xF8, 0);
+DEF_METASPRITE_2x2(ChainChomp_Attack_1, 0xE0, 0);
+DEF_METASPRITE_2x2(ChainChomp_Attack_2, 0xE4, 0);
+DEF_METASPRITE_2x2(ChainChomp_Jump, 0xE8, 0);
+DEF_METASPRITE_2x2(ChainChomp_Run, 0xDC, 0);
+
 
 MetaActor player;
 MetaActor boss;
