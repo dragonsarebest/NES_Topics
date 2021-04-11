@@ -7,7 +7,7 @@
           0,      8,      (code)+1,   attribute, \
           8,      0,      (code)+2,   attribute, \
           8,      8,      (code)+3,   attribute, \
-          128};
+          128}; //128 = number of bits
 
 
 #define WORLD_WIDTH 240*2
