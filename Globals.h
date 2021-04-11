@@ -1,4 +1,5 @@
-#define SELECTED 0xB0
+//#define SELECTED 0xB0
+#define SELECTED 0x31
 
 // define a 2x2 metasprite
 #define DEF_METASPRITE_2x2(name, code, attribute)\
@@ -73,7 +74,8 @@ byte numLives = 1;
 #define pastHereBeBlocks 0x70
 #define door 0xC4
 #define stairs 0xD8
-#define dust 0x80
+#define dust 0x32
+//#define dust 0x80
 
 char selectedPosition[3];
 const char playerPlaceBlock = 0xC0;
