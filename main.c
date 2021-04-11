@@ -456,11 +456,11 @@ void randomizeParticle(Particles * singleBricks, short brickSpeed, int x, int y)
     temp = rand()%brickSpeed;
     if(temp > brickSpeed/2)
     {
-      bck.sprite = 0x80;
+      bck.sprite = dust;
     }
     else
     {
-      bck.sprite = 0x81;
+      bck.sprite = dust+1;
     }
 
     singleBricks[i] = bck;
@@ -895,9 +895,9 @@ char updateActor(Actor * actor, char cur_oam, int index)
   int i = 0;
   int res = 0;
   char breakBlock;
-  
+
   char pad_result = pad_poll(0) | pad_poll(1);
-  
+
 
   /// 1111 1111, 0x01 = playerInAir,0x02 = lastFacingRight, 0x04 = isAttacking, 0x08 = is Player
   byte playerInAir = (actor->boolean & 0x01);
@@ -922,11 +922,14 @@ char updateActor(Actor * actor, char cur_oam, int index)
   {
     pad_result = 0;
   }
-  
 
-  if(actor->isSprite && isBlockable == false)
+
+  if(actor->isSprite && isBlockable == false || isBlockable == false && istracking == false && isPlayer == false && isBoss == false)
   {
     //dont update these as hard
+    
+    index = 0;
+    
     if(checkGround(actor->x/8,actor->y/8 + 1, 1) == 0)
     {
       actor->dy = 1;
@@ -938,77 +941,78 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
     actor->x += actor->dx * actor->moveSpeed;
     actor->y += actor->dy * actor->jumpSpeed;
+    
+    actor->currentAnimation = actor->startOfAnimations;
 
-    if(actor->isSprite)
+    /*
+    if(index >= 2 && index <= 7) 
     {
-      if(index >= 0 && index <= 5) 
-      {
-        actor->attribute = boss.attribute;
+      actor->attribute = boss.attribute;
 
-        if(actor->attribute & 0x04)
+      if(actor->attribute & 0x04)
+      {
+        actor->boolean |= 0x02;
+      }
+      else
+      {
+        actor->boolean &= 0xFD;
+      }
+
+      lastFacingRight = (boss.boolean & 0x02) >> 1;
+
+      if(index == 0)
+      {
+        if(lastFacingRight)
         {
-          actor->boolean |= 0x02;
+          actor->x = boss.x - 8;
         }
         else
         {
-          actor->boolean &= 0xFD;
+          actor->x = boss.x + 16;
         }
 
-        lastFacingRight = (boss.boolean & 0x02) >> 1;
 
-        if(index == 0)
+        if(actor->y != boss.y)
         {
-          if(lastFacingRight)
-          {
-            actor->x = boss.x - 8;
-          }
-          else
-          {
-            actor->x = boss.x + 16;
-          }
-
-
-          if(actor->y != boss.y)
-          {
-            actor->attribute = (actor->attribute&0x7f) | (0x80 * actor->attribute&0x80);
-          }
-          if(actor->attribute & 0x80)
-          {
-            actor->y = boss.y + 6;
-          }
-          else
-          {
-            actor->y = boss.y + 10;
-          }
-
+          actor->attribute = (actor->attribute&0x7f) | (0x80 * actor->attribute&0x80);
         }
-        if(index == 1)
+        if(actor->attribute & 0x80)
         {
-          if(lastFacingRight)
-          {
-            actor->x = lastX - 8;
-          }
-          else
-          {
-            actor->x = lastX + 8;
-          }
+          actor->y = boss.y + 6;
+        }
+        else
+        {
+          actor->y = boss.y + 10;
+        }
+
+      }
+      if(index == 1)
+      {
+        if(lastFacingRight)
+        {
+          actor->x = lastX - 8;
+        }
+        else
+        {
+          actor->x = lastX + 8;
+        }
 
 
-          if(actor->y != lastY)
-          {
-            actor->attribute = (actor->attribute&0x7f) | (0x80 * actor->attribute&0x80);
-          }
-          if(actor->attribute & 0x80)
-          {
-            actor->y = lastY + 6;
-          }
-          else
-          {
-            actor->y = lastY + 10;
-          }
+        if(actor->y != lastY)
+        {
+          actor->attribute = (actor->attribute&0x7f) | (0x80 * actor->attribute&0x80);
+        }
+        if(actor->attribute & 0x80)
+        {
+          actor->y = lastY + 6;
+        }
+        else
+        {
+          actor->y = lastY + 10;
         }
       }
-    }
+    }*/
+
 
     return cur_oam;
   }
@@ -1068,7 +1072,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
           {
             pad_result |= 0x80;
           }
-          
+
 
           if(actor->grounded == true && actor->dx == 0)
           {
@@ -1262,7 +1266,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
         breakBlock = searchPlayer(actor->x, actor->y + (upOffset*8), 0, lastFacingRight, offset);
         //1101
-        
+
         if(isBoss && selectedPosition[2] != 0)
         {
           breaking = true;
@@ -1853,6 +1857,7 @@ void main(void) {
 
   char cur_oam;
   unsigned int i = 0, j = 0;
+  Actor chain;
 
   worldScrolling = false;
   scrollSwap = !worldScrolling;
@@ -1860,7 +1865,7 @@ void main(void) {
   worldNumber = 0;
   transition = 0x01;
   //default world parameters
-  
+
   bank_spr(1);
   bank_bg(0);
 
@@ -1880,34 +1885,36 @@ void main(void) {
   MetaTable[7] = ChainChomp_Attack_2;		//attack 2
   MetaTable[8] = ChainChomp_Jump;		//jump
   MetaTable[9] = ChainChomp_Run;		//run
+  
+  MetaTable[10] = longChain;
 
   //put all actors here!
   allActors[0] = &player;
   allActors[1] = &boss;
+  
 
   pal_all(PALETTE);// generally before game loop (in main)
 
-  for(i = 2; i < 4; i++)
-  {
+  
+  //chain.currentAnimation = 0x30; //if it is a sprite
+  chain.currentAnimation = 0;
+  chain.startOfAnimations = 10;
+  chain.x = (13+i)*8;
+  chain.y = 13*8;
+  chain.dx = 0;
+  chain.dy = 0;
+  chain.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
+  chain.alive = 2; // hit points
+  chain.moveSpeed = 1;
+  chain.jumpSpeed = 2;
+  chain.grounded = true;
+  //0x01 = playerInAir,0x02 = lastFacingRight, 0x04 = isAttacking, 0x08 = is Player, 0x10 = is boss, 0x20 = isBlockable, 0x40 = ISBLOCKED, 0x80 = tracks
+  chain.boolean = 0x01 | 0x02;
+  //chain.isSprite = true; //if it is a sprite
+  chain.hurtFlash = 0;
 
-    Actor chain;
-    chain.currentAnimation = 0xB3;
-    chain.x = (13+i)*8;
-    chain.y = 13*8;
-    chain.dx = 0;
-    chain.dy = 0;
-    chain.attribute = 1 | (0 << 5) | (0 << 6) | (0 << 7);
-    chain.alive = 2; // hit points
-    chain.moveSpeed = 1;
-    chain.jumpSpeed = 2;
-    chain.grounded = true;
-    //0x01 = playerInAir,0x02 = lastFacingRight, 0x04 = isAttacking, 0x08 = is Player, 0x10 = is boss, 0x20 = isBlockable, 0x40 = ISBLOCKED, 0x80 = tracks
-    chain.boolean = 0x01 | 0x02;
-    chain.isSprite = true;
-    chain.hurtFlash = 0;
-
-    allActors[i] = &chain;
-  }
+  allActors[2] = &chain;
+  
 
   player.x = 8*1;
   player.y = 23* 8;

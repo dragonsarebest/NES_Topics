@@ -10,6 +10,15 @@
           128}; //128 = number of bits
 
 
+//long BOIS
+#define DEF_METASPRITE_4x1(name, code, attribute)\
+ unsigned char name[]={\
+ 	  0,      0,      (code),   attribute, \
+          8,      0,      (code),   attribute, \
+ 	  16,      0,      (code),   attribute, \
+          24,      0,      (code),   attribute, \
+          128};
+
 #define WORLD_WIDTH 240*2
 #define WORLD_HEIGHT 256
 
@@ -63,6 +72,7 @@ byte numLives = 1;
 #define pastHereBeBlocks 0x70
 #define door 0xC4
 #define stairs 0xD8
+#define dust 0x80
 
 char selectedPosition[3];
 const char playerPlaceBlock = 0xC0;
@@ -87,6 +97,8 @@ DEF_METASPRITE_2x2(ChainChomp_Attack_2, 0x2C, 0);
 DEF_METASPRITE_2x2(ChainChomp_Jump, 0x24, 0);
 DEF_METASPRITE_2x2(ChainChomp_Run, 0x1C, 0);
 
+DEF_METASPRITE_4x1(longChain, 0x30, 0);
+//DEF_METASPRITE_4x1(longChain, 0x30, 0);
 
 Actor player;
 Actor boss;
