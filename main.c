@@ -707,6 +707,20 @@ void scrollWorld(byte direction, Actor* PlayerActor)
   }
 }
 
+void playerSelect(int playerX, int playerY, int yOffset, int xOffset, byte findEmpty)
+{
+  byte inFront = checkGround((playerX/8 + xOffset), (playerY/8 + yOffset), findEmpty);
+  selectedPosition[2] = 0;
+  
+  if(inFront != findEmpty)
+  {
+    selectedPosition[2] = 1;
+  }
+  
+  selectedPosition[0] = (playerX/8 + xOffset);
+  selectedPosition[1] = (playerY/8 + yOffset);
+}
+
 void setSelectedPosition(int playerX, int playerY, int upOffset, byte lastFacingRight, int offset, byte findEmpty)
 {
   byte breakBlock = searchPlayer(playerX, playerY + (upOffset*8), 0, lastFacingRight, offset);
@@ -954,8 +968,8 @@ char updateActor(Actor * actor, char cur_oam, int index)
     }
   }
   */
-  
-  
+
+
   if(actor->isSprite && isBlockable == false || isBlockable == false && istracking == false && isPlayer == false && isBoss == false)
   {
     //dont update these as hard
@@ -1084,7 +1098,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
       if(absVal(actor->x - player.x) > dist || actor->dx == 0) // && player.act.hurtFlash <= 0
       {
-        
+
         if(actor->x < player.x)
         {
           pad_result |= 0x80;
@@ -1120,9 +1134,9 @@ char updateActor(Actor * actor, char cur_oam, int index)
             //pad_result &= 0x3F;
             boss.boolean &= 0xBF; //dont break again
             pad_result |= attackButton;
-            
+
           }
-          
+
 
           //continue input
           if(attacking == false)
@@ -1141,8 +1155,8 @@ char updateActor(Actor * actor, char cur_oam, int index)
           {
             boss.dx = 0;
           }
-          
-          
+
+
 
 
           if(actor->grounded == true && actor->dx == 0)
@@ -1153,6 +1167,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
             {
               offset = 0; //fixes bug where you couldnt break blocks on your left if you were touching them
             }
+            
             setSelectedPosition(actor->x, actor->y, 0, lastFacingRight, offset, 0);
 
             if(selectedPosition[2] != 0)
@@ -1178,7 +1193,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
             }
 
           }
-          
+
           if(attacking == false)
           {
             boss.moveSpeed = chargeTable[chargeTimer];
@@ -1196,7 +1211,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
             chargeTimer = 0;
             boss.moveSpeed = 2;
           }
-          
+
           if(boss.hurtFlash != 0)
           {
             boss.dx *= -1;
@@ -1303,24 +1318,66 @@ char updateActor(Actor * actor, char cur_oam, int index)
       //Up_Down = 0;
       if(shift)
       {
-        if((pad_result & 0x20))
+        actor->dx = 0;
+        if(lastTouch == 0)
         {
-          noBlocksAbove = aboveOrBellowPlayer(player.x, player.y, 1, false, lastFacingRight, 0);
+          if((pad_result & 0x20))
           {
-            //pressing down on keypad
-            Up_Down = 0x01;
-            lastTouch = 10;
+            noBlocksAbove = aboveOrBellowPlayer(player.x, player.y, 1, false, lastFacingRight, 0);
+            {
+              //pressing down on keypad
+              //Up_Down = 0x01;
+              Up_Down++;
+              if(Up_Down > 2)
+              {
+                Up_Down = 2;
+              }
+              lastTouch = waitTouch;
+            }
           }
-        }
-        else if(((pad_result & 0x10)))
-        {
-          //pressing up but cant jump.... look up instead!
-          Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
-          lastTouch = 10;
-        }
-        else if(lastTouch <= 0)
-        {
-          Up_Down = 0x00; 
+          else if(((pad_result & 0x10)))
+          {
+            //pressing up but cant jump.... look up instead!
+            //Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
+            Up_Down--;
+            if(Up_Down < -2)
+            {
+              Up_Down = -2;
+            }
+            lastTouch = waitTouch;
+          }
+          else
+          {
+            if(((pad_result & 0x40)))
+            {
+              //pressing up but cant jump.... look up instead!
+              //Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
+              leftRight--;
+              if(leftRight < -1)
+              {
+                leftRight = -1;
+              }
+              lastTouch = waitTouch;
+            }
+            else if(((pad_result & 0x80)))
+            {
+              //pressing up but cant jump.... look up instead!
+              //Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
+              leftRight++;
+              if(leftRight > 2)
+              {
+                leftRight = 2;
+              }
+              lastTouch = waitTouch;
+            }
+            else if(lastTouch <= 0)
+            {
+              //Up_Down = 0x00; 
+              Up_Down = 1;
+              leftRight = 2;
+            }
+          }
+
         }
 
       }
@@ -1328,13 +1385,14 @@ char updateActor(Actor * actor, char cur_oam, int index)
       {
         lastTouch--;
       }
+
     }
 
 
     //player only behavior
     if(actor->hurtFlash == 0)
     {
-      byte offset = 1;
+      int offset = 1;
       int upOffset = 0;
 
       if(lastFacingRight == false)
@@ -1343,23 +1401,20 @@ char updateActor(Actor * actor, char cur_oam, int index)
       }
       if(isPlayer)
       {
-        if(Up_Down == 0x01)
-        {
-          // up
-          upOffset = 1;
-        }
-        else if(Up_Down == 0x02)
-        {
-          // down
-          upOffset = -1;
-        }
-        else
-        {
-          upOffset = 0;
-        }
+        upOffset = Up_Down;
+        offset = leftRight;
       }
-      setSelectedPosition(actor->x, actor->y, upOffset, lastFacingRight, offset, 0);
-
+      
+      
+      if(!isPlayer)
+      {
+        setSelectedPosition(actor->x, actor->y, upOffset, lastFacingRight, offset, 0);;
+      }
+      else
+      {
+        playerSelect(actor->x, actor->y, Up_Down, leftRight, 0);
+      }
+      
       //only players & boses can break blocks
       if((attacking == false && isPlayer || isBoss))
       {
@@ -1384,7 +1439,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
           int itemX, itemY, collision;
           byte suitableOption = true;
-          
+
           breaking = false;
           //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
           //outsideHelper = breakBlock;
@@ -1637,7 +1692,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
         {
           //boss.boolean |= 0x40; //breaking whatever is infront of boss
           //boss.boolean &= 0xFB; //stop attacking bc youre doing it again
-          
+
           //if the chain chomp is facing player
           if((boss.boolean & 0x04) == 0 && boss.hurtFlash == 0 && ( ((boss.attribute & 0x40) && player.x <= boss.x ) || (!(boss.attribute & 0x40) && player.x >= boss.x )))
           {
@@ -1685,7 +1740,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
           }
 
           boss.dy = -2;
-          
+
           if(boss.x < player.x)
           {
             boss.x -= 10;
@@ -1700,7 +1755,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
     }
     else
     {
-     boss.boolean &= 0xBF; // do not attack, do not break, you cannot since you are hurt
+      boss.boolean &= 0xBF; // do not attack, do not break, you cannot since you are hurt
     }
 
     if(actor->grounded && playerInAir)
@@ -1782,10 +1837,10 @@ char updateActor(Actor * actor, char cur_oam, int index)
   {
     //animate the player!
     byte shoudlRun = true;
-    
+
     if(attacking)
     {
-      
+
       shoudlRun = false;
       if( actor->animationTimer < 8)
       {
@@ -1810,7 +1865,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
         attacking = false;
         shoudlRun = true;
       }
-      
+
     }
 
     if(shoudlRun)
@@ -1849,7 +1904,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
     }
 
   }
-  
+
 
   /*
   {
@@ -2159,8 +2214,8 @@ void main(void) {
         {
           if(singleBricks[i].lifetime > 0)
           {
-            
-            
+
+
             if(boss.alive <= 0 && justKilledBoss && deathTimer > 0)
             {
               singleBricks[i].x = singleBricks[i].x + singleBricks[i].dx/deathTimer;
@@ -2189,7 +2244,7 @@ void main(void) {
 
     }
 
-    
+
     //render all actors
     for(i = 0; i < NumActors; i++)
     {
@@ -2208,7 +2263,7 @@ void main(void) {
     }
 
 
-    
+
     //boss death flash and stuff
     if(boss.alive <= 0 && deathTimer > 0 && deathTimer < 0xF)
     {
@@ -2240,7 +2295,7 @@ void main(void) {
         singleBricks[i].y = boss.y;
 
       }
-      
+
       pal_fade_to(6);
       deathTimer = 0xF;
       //oam_hide_rest(cur_oam);
@@ -2251,7 +2306,7 @@ void main(void) {
       justKilledBoss = false;
       //oam_hide_rest(cur_oam);
     }
-    
+
 
     //scroll world
     scrollWorld(transition, &player);
