@@ -923,6 +923,76 @@ int detectAllCollisions(Actor * antagonist, int distX, int distY)
   return -1;
 }
 
+void breakThisBlock(int itemX, int itemY, byte isPlayer)
+{
+  char block[1];
+  char oldBlock;
+  int i;
+
+  ppu_wait_nmi();
+  oldBlock = getchar_vram(itemX, itemY);
+  
+  if(oldBlock >= door && oldBlock <= door+4)
+  {
+    int x = itemX, y = itemY, i;
+    //0xFc -> 0xFF
+    block[0] = stairs + (oldBlock -  door);
+
+
+    if(oldBlock == door+1)
+    {
+      y--;
+    }
+    if( oldBlock == door+2)
+    {
+      x--;
+    }
+    if(oldBlock == door+3)
+    {
+      x--;
+      y--;
+    }
+
+    for(i = 0; i < numDoors; i++)
+    {
+      if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
+      {
+        DoorInfo[i]--;
+        //only need to break one pannel to progress..
+        if(DoorInfo[i] != 4)
+        {
+          UpTo8DoorsOpen = UpTo8DoorsOpen | 1 << i;
+          //stairwellAccessable!
+
+        }
+        break;
+      }
+    }
+  }
+  else
+  {
+    block[0] = 0x0D;
+  }
+
+  setGround(itemX, itemY, 0);
+
+  updateScreen(itemX, itemY, block, 1);
+
+  if(isPlayer)
+  {
+    change |= 0x02;
+  }
+  numActive = NUM_BRICKS;
+
+  for(i = 0; i < numActive; i++)
+  {
+    singleBricks[i].lifetime = brickLifetime;
+    singleBricks[i].x = itemX*8-5;
+    singleBricks[i].y = itemY*8;
+
+  }
+}
+
 char updateActor(Actor * actor, char cur_oam, int index)
 {
   int i = 0;
@@ -1172,19 +1242,6 @@ char updateActor(Actor * actor, char cur_oam, int index)
             {
               pad_result |= 0x04; //breaking
             }
-            /*else
-            {
-              if(boss.x < player.x)
-              {
-                pad_result |= 0x80;
-                pad_result &= 0xBF;
-              }
-              else
-              {
-                pad_result |= 0x40;
-                pad_result &= 0x7F;
-              }
-            }*/
             else if(attacking == false)
             {
               pad_result |= 0x10; // jump
@@ -1245,9 +1302,23 @@ char updateActor(Actor * actor, char cur_oam, int index)
       breaking = pad_result & attackButton;
       noBlocksAbove = aboveOrBellowPlayer(actor->x, actor->y, 1, true, lastFacingRight, 0);
 
-      actor->attribute = (actor->attribute & 0xBF) | (!lastFacingRight  << 6);
-      actor->boolean = (actor->boolean & 0xFB) | (!lastFacingRight  << 2);
-
+      if(!shift)
+      {
+        byte old = actor->attribute & 0x40;
+        byte new = 0;
+      	actor->attribute = (actor->attribute & 0xBF) | (!lastFacingRight  << 6);
+      	actor->boolean = (actor->boolean & 0xFB) | (!lastFacingRight  << 2);
+        new = actor->attribute & 0x40;
+        
+        if(new != old && leftRight != 1)
+        {
+          leftRight *= -1;
+          leftRight ++;
+          //mirror's leftRight when the player turns around
+        }
+        
+      }
+      
       if((res & 0x0C) != 0 && actor->dx > 0)
       {
         //player.act.dx = -1;
@@ -1380,7 +1451,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
             {
               //Up_Down = 0x00;
               Up_Down = 1;
-              leftRight = 2;
+              leftRight = 1;
 
             }
           }
@@ -1393,6 +1464,8 @@ char updateActor(Actor * actor, char cur_oam, int index)
         lastTouch--;
       }
     }
+    
+
 
 
     //player only behavior
@@ -1409,6 +1482,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
       {
         upOffset = Up_Down;
         offset = leftRight;
+        
       }
 
 
@@ -1418,7 +1492,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
       }
       else
       {
-        playerSelect(actor->x, actor->y, Up_Down, leftRight, 0);
+        playerSelect(actor->x, actor->y, upOffset, offset, 0);
       }
 
       //only players & boses can break blocks
@@ -1507,13 +1581,13 @@ char updateActor(Actor * actor, char cur_oam, int index)
         else if(breaking)
         {
           //is player
-           if(selectedPosition[2] != 0)
-           {
-             itemX = selectedPosition[0];
-             itemY = selectedPosition[1];
-             suitableOption = true;
+          if(selectedPosition[2] != 0)
+          {
+            itemX = selectedPosition[0];
+            itemY = selectedPosition[1];
+            suitableOption = true;
 
-           }
+          }
           else
           {
             suitableOption = false;
@@ -1522,85 +1596,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
         if(suitableOption)
         {
-          
-          //updateBombBlockLives(1, 0x02);
-
-          //check if it's a door (c4->c7)
-          //if it is replace with stair blocks
-          //else put background block in
-
-          {
-            char oldBlock;
-            ppu_wait_nmi();
-            oldBlock = getchar_vram(itemX, itemY);
-
-            //outsideHelper = oldBlock;
-
-            if(oldBlock >= door && oldBlock <= door+4)
-            {
-              int x = itemX, y = itemY, i;
-              //0xFc -> 0xFF
-              newBlock = stairs + (oldBlock -  door);
-
-
-              if(oldBlock == door+1)
-              {
-                y--;
-              }
-              if( oldBlock == door+2)
-              {
-                x--;
-              }
-              if(oldBlock == door+3)
-              {
-                x--;
-                y--;
-              }
-
-              for(i = 0; i < numDoors; i++)
-              {
-                if(x == DoorPositions[i*2] && y == DoorPositions[i*2 + 1])
-                {
-                  DoorInfo[i]--;
-                  //only need to break one pannel to progress..
-                  if(DoorInfo[i] != 4)
-                  {
-                    UpTo8DoorsOpen = UpTo8DoorsOpen | 1 << i;
-                    //stairwellAccessable!
-
-                  }
-                  break;
-                }
-              }
-
-            }
-
-
-          }
-
-          {
-            char block[1];
-            block[0] = newBlock;
-
-            setGround(itemX, itemY, 0);
-
-            updateScreen(itemX, itemY, block, 1);
-
-            if(isPlayer)
-            {
-              change |= 0x02;
-            }
-            numActive = NUM_BRICKS;
-
-            for(i = 0; i < numActive; i++)
-            {
-              singleBricks[i].lifetime = brickLifetime;
-              singleBricks[i].x = itemX*8-5;
-              singleBricks[i].y = itemY*8;
-
-            }
-
-          }
+          breakThisBlock(itemX, itemY, isPlayer);
         }
       }
 

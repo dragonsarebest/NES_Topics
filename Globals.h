@@ -128,7 +128,7 @@ byte chargeTimer = 0;
 
 //
 int Up_Down = 1; //minning up or down, or straight ahead
-int leftRight = 2;
+int leftRight = 1;
 byte lastTouch = 0; //gives the player leeway - 10 frames to let go of shift, otherwise it will continually register
 byte resetTouch = 0;
 const byte waitTouch = 5;
