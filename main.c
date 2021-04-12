@@ -1078,7 +1078,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
       if(isBoss)
       {
-        dist = 128;
+        dist = 256;
       }
 
 
@@ -1114,7 +1114,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
             isBlocked = false;
             attacking = true;
             boss.animationTimer = 0;
-            chargeTimer = 0;
+            //chargeTimer = 0;
             boss.moveSpeed = 0;
             boss.boolean |= 0x04;
             //pad_result &= 0x3F;
@@ -1159,7 +1159,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
             {
               pad_result |= 0x04; //breaking
             }
-            else
+            /*else
             {
               if(boss.x < player.x)
               {
@@ -1171,11 +1171,11 @@ char updateActor(Actor * actor, char cur_oam, int index)
                 pad_result |= 0x40;
                 pad_result &= 0x7F;
               }
+            }*/
+            else if(attacking == false)
+            {
+              pad_result |= 0x10; // jump
             }
-            //else
-            //{
-            //  pad_result |= 0x10; // jump
-            //}
 
           }
           
