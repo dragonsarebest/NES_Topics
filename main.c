@@ -1089,10 +1089,15 @@ char updateActor(Actor * actor, char cur_oam, int index)
       {
         if(bossNumber == 0)
         {
+          if(isBlocked)
+          {
+            pad_result |= attackButton;
+          }
           //chain chomp
           if(attacking)
           {
             pad_result &= 0x3F;
+            pad_result |= attackButton;
           }
 
           //continue input
@@ -1168,7 +1173,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
     {
       byte shift = pad_result & 0x02;
       jumping = pad_result & 0x10;
-      breaking = pad_result & 0x04;
+      breaking = pad_result & attackButton;
       noBlocksAbove = aboveOrBellowPlayer(actor->x, actor->y, 1, true, lastFacingRight, 0);
 
       actor->attribute = (actor->attribute & 0xBF) | (!lastFacingRight  << 6);

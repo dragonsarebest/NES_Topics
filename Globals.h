@@ -29,6 +29,7 @@
 
 #define BYTE_PER_COL 32
 
+#define attackButton 0x01
 
 int outsideHelper; //used for debugging
 int outsideHelper2;

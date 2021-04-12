@@ -23,7 +23,8 @@ typedef struct Actor
   unsigned char jumpSpeed;
   
   char grounded;
-  byte boolean; // 1111 1111, 0x01 = playerInAir,0x02 = lastFacingRight, 0x04 = isAttacking, 0x08 = is Player, 0x10 = is boss, 0x20 = isBlockable, 0x40 = ISBLOCKED, 0x80 = tracks
+  byte boolean;
+  //tracks, ISBLOCKED, isBlockable, is boss, is Player, isAttacking, lastFacingRight, playerInAir
   char isSprite;
   
   int animationTimer; //0-15
