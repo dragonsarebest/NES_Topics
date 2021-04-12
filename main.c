@@ -920,7 +920,6 @@ char updateActor(Actor * actor, char cur_oam, int index)
   char pad_result = pad_poll(0) | pad_poll(1);
 
 
-  /// 1111 1111, 0x01 = playerInAir,0x02 = lastFacingRight, 0x04 = isAttacking, 0x08 = is Player
   byte playerInAir = (actor->boolean & 0x01);
   byte lastFacingRight = (actor->boolean & 0x02) >> 1;
   byte attacking = (actor->boolean & 0x04) >> 2;
@@ -944,7 +943,19 @@ char updateActor(Actor * actor, char cur_oam, int index)
     pad_result = 0;
   }
 
-
+  /*
+  if(isBoss)
+  {
+    writeBinary(2, 5, boss.boolean);
+    {
+      char dx[2];
+      sprintf(dx, "%d", boss.animationTimer);
+      updateScreen(2, 6, dx, 2);
+    }
+  }
+  */
+  
+  
   if(actor->isSprite && isBlockable == false || isBlockable == false && istracking == false && isPlayer == false && isBoss == false)
   {
     //dont update these as hard
@@ -1073,6 +1084,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
       if(absVal(actor->x - player.x) > dist || actor->dx == 0) // && player.act.hurtFlash <= 0
       {
+        
         if(actor->x < player.x)
         {
           pad_result |= 0x80;
@@ -1082,6 +1094,13 @@ char updateActor(Actor * actor, char cur_oam, int index)
           pad_result |= 0x40;
         }
       }
+      else
+      {
+        if(isBoss && chargeTimer >= MAX_Charge -1)
+        {
+          chargeTimer = 0;
+        }
+      }
 
       //go toward player basic script
 
@@ -1089,27 +1108,41 @@ char updateActor(Actor * actor, char cur_oam, int index)
       {
         if(bossNumber == 0)
         {
+          //chain chomp
           if(isBlocked)
           {
+            isBlocked = false;
+            attacking = true;
+            boss.animationTimer = 0;
+            chargeTimer = 0;
+            boss.moveSpeed = 0;
+            boss.boolean |= 0x04;
+            //pad_result &= 0x3F;
+            boss.boolean &= 0xBF; //dont break again
             pad_result |= attackButton;
+            
           }
-          //chain chomp
-          if(attacking)
-          {
-            pad_result &= 0x3F;
-            pad_result |= attackButton;
-          }
+          
 
           //continue input
-          if(boss.dx < 0)
+          if(attacking == false)
           {
-            pad_result |= 0x40;
+            if(boss.dx < 0)
+            {
+              pad_result |= 0x40;
 
+            }
+            else if(boss.dx > 0)
+            {
+              pad_result |= 0x80;
+            }
           }
-          else if(boss.dx > 0)
+          else
           {
-            pad_result |= 0x80;
+            boss.dx = 0;
           }
+          
+          
 
 
           if(actor->grounded == true && actor->dx == 0)
@@ -1144,6 +1177,29 @@ char updateActor(Actor * actor, char cur_oam, int index)
             //  pad_result |= 0x10; // jump
             //}
 
+          }
+          
+          if(attacking == false)
+          {
+            boss.moveSpeed = chargeTable[chargeTimer];
+            if(chargeTimer < MAX_Charge-1)
+            {
+              chargeTimer++;
+            }
+            else
+            {
+              //chargeTimer = 0;
+            }
+          }
+          else
+          {
+            chargeTimer = 0;
+            boss.moveSpeed = 2;
+          }
+          
+          if(boss.hurtFlash != 0)
+          {
+            boss.dx *= -1;
           }
         }
       }
@@ -1312,22 +1368,24 @@ char updateActor(Actor * actor, char cur_oam, int index)
         breakBlock = searchPlayer(actor->x, actor->y + (upOffset*8), 0, lastFacingRight, offset);
         //1101
 
-        if(isBoss && selectedPosition[2] != 0)
-        {
-          breaking = true;
-        }
+        //if(isBoss && selectedPosition[2] != 0)
+        //{
+        // //breaking = true;
+        //}
 
-        if(breaking)
+        if(breaking && attacking == false)
         {
           attacking = true;
           //actor->boolean |= 0x04;
           actor->animationTimer = 0;
         }
-        if((breakBlock != 0) && (breaking) || selectedPosition[2] != 0 && (breaking))
+        if((breakBlock != 0) && (breaking) || selectedPosition[2] != 0 && (breaking) || isBoss && selectedPosition[2] != 0)
         {
 
           int itemX, itemY, collision;
           byte suitableOption = true;
+          
+          breaking = false;
           //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
           //outsideHelper = breakBlock;
 
@@ -1577,14 +1635,14 @@ char updateActor(Actor * actor, char cur_oam, int index)
         }
         if(returnVal >= 0x03)
         {
+          //boss.boolean |= 0x40; //breaking whatever is infront of boss
+          //boss.boolean &= 0xFB; //stop attacking bc youre doing it again
+          
           //if the chain chomp is facing player
-          if(attacking == false && boss.hurtFlash == 0 && ( ((boss.attribute & 0x40) && player.x <= boss.x ) || (!(boss.attribute & 0x40) && player.x >= boss.x )))
+          if((boss.boolean & 0x04) == 0 && boss.hurtFlash == 0 && ( ((boss.attribute & 0x40) && player.x <= boss.x ) || (!(boss.attribute & 0x40) && player.x >= boss.x )))
           {
-            //attacking = true;
-            //breaking = true;
-            //set boss attacking to true
-            boss.boolean |= 0x04;
-
+            boss.boolean |= 0x40; //breaking whatever is infront of boss
+            boss.dx = 0;
             player.hurtFlash += 20;
 
             change |= 0x30;
@@ -1600,16 +1658,10 @@ char updateActor(Actor * actor, char cur_oam, int index)
               player.dx = 30;
             }
           }
-          else
-          {
-            boss.boolean &= 0xFB; // do not attack
-            boss.boolean |= 0x40; // break
-          }
         }
         else
         {
-          boss.boolean &= 0xFB; // do not attack
-          boss.boolean |= 0x40; // break
+          boss.boolean &= 0xBF; // do not attack, do not break, thers nothing in front of you
         }
       }
 
@@ -1636,17 +1688,19 @@ char updateActor(Actor * actor, char cur_oam, int index)
           
           if(boss.x < player.x)
           {
-            boss.dx = -1;
+            boss.x -= 10;
           }
           else
           {
-            boss.dx = 1;
+            boss.x += 10;
           }
-          
-          boss.x += boss.dx * 10;
         }
 
       }
+    }
+    else
+    {
+     boss.boolean &= 0xBF; // do not attack, do not break, you cannot since you are hurt
     }
 
     if(actor->grounded && playerInAir)
@@ -1724,17 +1778,14 @@ char updateActor(Actor * actor, char cur_oam, int index)
   }
 
 
-  if(actor == &boss)
-  {
-    outsideHelper = 1;
-  }
 
   {
     //animate the player!
     byte shoudlRun = true;
-
+    
     if(attacking)
     {
+      
       shoudlRun = false;
       if( actor->animationTimer < 8)
       {
@@ -1755,9 +1806,11 @@ char updateActor(Actor * actor, char cur_oam, int index)
       }
       else
       {
+        actor->animationTimer = 0;
         attacking = false;
         shoudlRun = true;
       }
+      
     }
 
     if(shoudlRun)
@@ -1796,6 +1849,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
     }
 
   }
+  
 
   /*
   {

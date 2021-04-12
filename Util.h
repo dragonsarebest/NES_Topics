@@ -24,7 +24,8 @@ typedef struct Actor
   
   char grounded;
   byte boolean;
-  //tracks, ISBLOCKED, isBlockable, is boss, is Player, isAttacking, lastFacingRight, playerInAir
+  //0x80, 0x40, 0x20, 0x10...
+  //tracks, ISBLOCKED, isBlockable, isboss, isPlayer, isAttacking, lastFacingRight, playerInAir
   char isSprite;
   
   int animationTimer; //0-15

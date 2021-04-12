@@ -53,10 +53,10 @@ int jumpTable[MAX_JUMP] =
   -4, -2, -1, 0, 1, 2, 4
 };
 
-#define MAX_Charge 7
+#define MAX_Charge 9
 int chargeTable[MAX_Charge] = 
 {
-  1, 2, 4, 8, 12, -2, 2
+  1, 2, 2, 3, 3, 4, 5, 6, 7,
 };
 
 #define NUM_BRICKS 16
@@ -123,6 +123,7 @@ byte bossSpawnedTracker = 0;
 byte spawnBoss = false;
 byte bossNumber = 0;
 byte justKilledBoss = false;
+byte chargeTimer = 0;
 //byte BossAttacking = false;
 
 //
