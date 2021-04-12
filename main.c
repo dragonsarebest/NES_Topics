@@ -1611,9 +1611,9 @@ char updateActor(Actor * actor, char cur_oam, int index)
       //extended reach for player to hit
       //returnVal = returnVal | spriteCollision(&player, &boss, 30, 24);
       returnVal = returnVal | spriteCollision(&player, &chain, 8, 8);
-      if(returnVal >= 0x03)
+      if(returnVal >= 0x03 && attacking)
       {
-        if(breaking)
+        //if(breaking)
         {
           //only hurt boss when swinging sword
           boss.hurtFlash += 5;
@@ -1903,6 +1903,7 @@ void main(void) {
 
   char cur_oam;
   unsigned int i = 0, j = 0;
+  byte debug = false;
   byte deathTimer = 0xF;
 
   worldScrolling = false;
@@ -2005,7 +2006,7 @@ void main(void) {
   while (1)
   {
     change = 0;
-    cur_oam = 4;
+    cur_oam = 4; //idk why this is necessary
 
     if(worldScrolling)
     {
@@ -2070,7 +2071,10 @@ void main(void) {
             if(i == 0 || i == 1)
             {
               //display reticles
-              cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
+              if(debug == true || i == 0)
+              {
+                cur_oam = oam_spr(selectedPosition[0]*8, selectedPosition[1]*8, SELECTED, selectedPosition[2], cur_oam);
+              }
             }
 
           }
@@ -2124,41 +2128,14 @@ void main(void) {
 
     }
 
-    for(i = 0; i < NumActors; i++)
-    {
-      //first obj is always player
-      if(allActors[i]->alive > 0 || i == 0)
-      {
-        if(allActors[i]->isSprite == false)
-        {
-          cur_oam = oam_meta_spr(allActors[i]->x, allActors[i]->y, cur_oam, MetaTable[allActors[i]->currentAnimation]);
-        }
-        else
-        {
-          cur_oam = oam_spr(allActors[i]->x, allActors[i]->y, allActors[i]->currentAnimation , allActors[i]->attribute, cur_oam);
-        }
-      }
-    }
-
-
-    //if(boss.alive > 0 && player.animationTimer % 2)
-    //{
-
-    //char dx[14];
-    //sprintf(dx, "boss_anim: %d", boss.animationTimer);
-    //updateScreen(2, 6, dx, 14);
-
-    //writeBinary(2,5, boss.boolean);
-
-    //writeBinary(2,6, chain.boolean);
-    //}
-
-    //scroll world
+    
+    //render all actors
     
     if(boss.alive <= 0 && deathTimer > 0 && deathTimer < 0xF)
     {
       boss.attribute = !(boss.attribute & 0x03) | boss.attribute & 0xFC;
       cur_oam = oam_meta_spr(boss.x, boss.y, cur_oam, MetaTable[boss.startOfAnimations]);
+      oam_hide_rest(cur_oam);
     }
 
     if(boss.alive <= 0 && justKilledBoss && deathTimer > 0)
@@ -2182,6 +2159,8 @@ void main(void) {
 
       }
       
+      boss.x = 15*8;
+      
       pal_fade_to(6);
       deathTimer = 0xF;
     }
@@ -2190,8 +2169,24 @@ void main(void) {
     {
       justKilledBoss = false;
     }
-
     
+    
+    for(i = 0; i < NumActors; i++)
+    {
+      //first obj is always player
+      if(allActors[i]->alive > 0 || i == 0)
+      {
+        if(allActors[i]->isSprite == false)
+        {
+          cur_oam = oam_meta_spr(allActors[i]->x, allActors[i]->y, cur_oam, MetaTable[allActors[i]->currentAnimation]);
+        }
+        else
+        {
+          cur_oam = oam_spr(allActors[i]->x, allActors[i]->y, allActors[i]->currentAnimation , allActors[i]->attribute, cur_oam);
+        }
+      }
+    }
+
 
 
     scrollWorld(transition, &player);
