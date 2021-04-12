@@ -1611,7 +1611,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
       //extended reach for player to hit
       //returnVal = returnVal | spriteCollision(&player, &boss, 30, 24);
       returnVal = returnVal | spriteCollision(&player, &chain, 8, 8);
-      if(returnVal >= 0x03 && attacking)
+      if(returnVal >= 0x03 && breaking)
       {
         //if(breaking)
         {
@@ -1628,15 +1628,17 @@ char updateActor(Actor * actor, char cur_oam, int index)
           }
 
           boss.dy = -2;
-
+          
           if(boss.x < player.x)
           {
-            boss.dx = -10;
+            boss.dx = -1;
           }
           else
           {
-            boss.dx = 10;
+            boss.dx = 1;
           }
+          
+          boss.x += boss.dx * 10;
         }
 
       }
@@ -2130,47 +2132,6 @@ void main(void) {
 
     
     //render all actors
-    
-    if(boss.alive <= 0 && deathTimer > 0 && deathTimer < 0xF)
-    {
-      boss.attribute = !(boss.attribute & 0x03) | boss.attribute & 0xFC;
-      cur_oam = oam_meta_spr(boss.x, boss.y, cur_oam, MetaTable[boss.startOfAnimations]);
-      oam_hide_rest(cur_oam);
-    }
-
-    if(boss.alive <= 0 && justKilledBoss && deathTimer > 0)
-    {
-      if(deathTimer == 0xF)
-      {
-        //pal_fade_to(2);
-        pal_bright(2);
-      }
-      deathTimer--;
-    }
-    else if(boss.alive <= 0 && justKilledBoss == false && deathTimer == 0)
-    {
-      numActive = NUM_BRICKS;
-
-      for(i = 0; i < numActive; i++)
-      {
-        singleBricks[i].lifetime = brickLifetime;
-        singleBricks[i].x = boss.x-5;
-        singleBricks[i].y = boss.y;
-
-      }
-      
-      boss.x = 15*8;
-      
-      pal_fade_to(6);
-      deathTimer = 0xF;
-    }
-
-    if(deathTimer == 0 && justKilledBoss)
-    {
-      justKilledBoss = false;
-    }
-    
-    
     for(i = 0; i < NumActors; i++)
     {
       //first obj is always player
@@ -2188,7 +2149,52 @@ void main(void) {
     }
 
 
+    
+    //boss death flash and stuff
+    if(boss.alive <= 0 && deathTimer > 0 && deathTimer < 0xF)
+    {
+      boss.attribute = !(boss.attribute & 0x03) | boss.attribute & 0xFC;
+      boss.x = 15*8;
+      boss.dx = 0;
+      boss.dy = 0;
+      cur_oam = oam_meta_spr(boss.x, boss.y, cur_oam, MetaTable[boss.startOfAnimations]);
+    }
 
+    if(boss.alive <= 0 && justKilledBoss && deathTimer > 0)
+    {
+      if(deathTimer == 0xF)
+      {
+        //pal_fade_to(2);
+        pal_bright(2);
+      }
+      deathTimer--;
+      //oam_hide_rest(cur_oam);
+    }
+    else if(boss.alive <= 0 && justKilledBoss == false && deathTimer == 0)
+    {
+      numActive = NUM_BRICKS;
+
+      for(i = 0; i < numActive; i++)
+      {
+        singleBricks[i].lifetime = brickLifetime;
+        singleBricks[i].x = boss.x-5;
+        singleBricks[i].y = boss.y;
+
+      }
+      
+      pal_fade_to(6);
+      deathTimer = 0xF;
+      //oam_hide_rest(cur_oam);
+    }
+
+    if(deathTimer == 0 && justKilledBoss)
+    {
+      justKilledBoss = false;
+      //oam_hide_rest(cur_oam);
+    }
+    
+
+    //scroll world
     scrollWorld(transition, &player);
 
     oam_hide_rest(cur_oam);

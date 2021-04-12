@@ -50,7 +50,13 @@ byte numDoors;
 int jumpTable[MAX_JUMP] = 
 {
   -4, -2, -1, 0, 1, 2, 4
-  };
+};
+
+#define MAX_Charge 7
+int chargeTable[MAX_Charge] = 
+{
+  1, 2, 4, 8, 12, -2, 2
+};
 
 #define NUM_BRICKS 16
 
