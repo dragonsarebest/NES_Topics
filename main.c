@@ -931,7 +931,7 @@ void breakThisBlock(int itemX, int itemY, byte isPlayer)
 
   ppu_wait_nmi();
   oldBlock = getchar_vram(itemX, itemY);
-  
+
   if(oldBlock >= door && oldBlock <= door+4)
   {
     int x = itemX, y = itemY, i;
@@ -1279,46 +1279,51 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
     actor->dx = ((pad_result & 0x80) >> 7) + -1 * ((pad_result & 0x40) >> 6);
 
-    if((pad_result & 0x80)>>7)
-    {
-      //actor->boolean |= 0x02;
-      //lastFacingRight = (actor->boolean & 0x02) >> 1;
-      lastFacingRight = true;
-    }
-    else
-    {
-      if((pad_result & 0x40)>>6)
-      {
-        //actor->boolean = actor->boolean & 0xFD; //1111 1101
-        //lastFacingRight = (actor->boolean & 0x02) >> 1;
-
-        lastFacingRight = false;
-      }
-    }
-
     {
       byte shift = pad_result & 0x02;
+      if(!shift)
+      {
+        if((pad_result & 0x80)>>7)
+        {
+          //actor->boolean |= 0x02;
+          //lastFacingRight = (actor->boolean & 0x02) >> 1;
+          lastFacingRight = true;
+        }
+        else
+        {
+          if((pad_result & 0x40)>>6)
+          {
+            //actor->boolean = actor->boolean & 0xFD; //1111 1101
+            //lastFacingRight = (actor->boolean & 0x02) >> 1;
+
+            lastFacingRight = false;
+          }
+        }
+      }
+
       jumping = pad_result & 0x10;
       breaking = pad_result & attackButton;
       noBlocksAbove = aboveOrBellowPlayer(actor->x, actor->y, 1, true, lastFacingRight, 0);
 
-      if(!shift)
+      if(!shift && resetTouch == 0)
       {
         byte old = actor->attribute & 0x40;
-        byte new = 0;
-      	actor->attribute = (actor->attribute & 0xBF) | (!lastFacingRight  << 6);
-      	actor->boolean = (actor->boolean & 0xFB) | (!lastFacingRight  << 2);
+        byte new;
+
+        actor->attribute = (actor->attribute & 0xBF) | (!lastFacingRight  << 6);
+        actor->boolean = (actor->boolean & 0xFB) | (!lastFacingRight  << 2);
+
         new = actor->attribute & 0x40;
-        
+
         if(new != old && leftRight != 1)
         {
           leftRight *= -1;
           leftRight ++;
           //mirror's leftRight when the player turns around
         }
-        
+
       }
-      
+
       if((res & 0x0C) != 0 && actor->dx > 0)
       {
         //player.act.dx = -1;
@@ -1387,7 +1392,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
       if(shift)
       {
         actor->dx = 0;
-        resetTouch--;
+
       }
 
       {
@@ -1452,7 +1457,8 @@ char updateActor(Actor * actor, char cur_oam, int index)
               //Up_Down = 0x00;
               Up_Down = 1;
               leftRight = 1;
-
+              resetTouch = 0;
+              lastTouch = waitTouch*3;
             }
           }
 
@@ -1463,8 +1469,13 @@ char updateActor(Actor * actor, char cur_oam, int index)
       {
         lastTouch--;
       }
+
+      if(resetTouch > 0)
+      {
+        resetTouch--;
+      }
     }
-    
+
 
 
 
@@ -1482,7 +1493,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
       {
         upOffset = Up_Down;
         offset = leftRight;
-        
+
       }
 
 
@@ -1596,6 +1607,11 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
         if(suitableOption)
         {
+          if(isBoss)
+          {
+            chargeTimer = 0;
+            boss.dx = 0;
+          }
           breakThisBlock(itemX, itemY, isPlayer);
         }
       }
@@ -2173,7 +2189,7 @@ void main(void) {
           boss.y =  25*8;
           boss.alive = 20;
           boss.moveSpeed = 2;
-          boss.jumpSpeed = 4;
+          boss.jumpSpeed = 6;
           boss.currentAnimation = 0;
           boss.startOfAnimations = 5;
           //seettings for world 1 boss
