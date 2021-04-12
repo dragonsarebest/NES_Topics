@@ -21,10 +21,8 @@
 /*
 // select current chr bank for sprites, 0..1
 void __fastcall__ bank_spr(unsigned char n);
-
 // select current chr bank for background, 0..1
 void __fastcall__ bank_bg(unsigned char n);
-
 */
 
 
@@ -1394,7 +1392,6 @@ char updateActor(Actor * actor, char cur_oam, int index)
       {
         lastTouch--;
       }
-
     }
 
 
@@ -1429,17 +1426,11 @@ char updateActor(Actor * actor, char cur_oam, int index)
       {
         char newBlock = 0x0D;
         int itemX, itemY, collision;
-        byte suitableOption = true;
+        byte suitableOption = false;
 
         if(!isPlayer)
         {
           breakBlock = searchPlayer(actor->x, actor->y + (upOffset*8), 0, lastFacingRight, offset);
-          //1101
-
-          //if(isBoss && selectedPosition[2] != 0)
-          //{
-          // //breaking = true;
-          //}
 
           if(breaking && attacking == false)
           {
@@ -1449,6 +1440,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
           }
           if((breakBlock != 0) && (breaking) || selectedPosition[2] != 0 && (breaking) || isBoss && selectedPosition[2] != 0)
           {
+            suitableOption = true;
             breaking = false;
             //breakblock = option4 bit, option3 bit, option2 bit, option1 bit...
             //outsideHelper = breakBlock;
@@ -1509,27 +1501,28 @@ char updateActor(Actor * actor, char cur_oam, int index)
 
               }
             }
-            itemY += upOffset;
           }
+          itemY += upOffset;
         }
         else if(breaking)
         {
-          suitableOption = false;
-          itemX = selectedPosition[0];
-          itemY = selectedPosition[1];
-          if(selectedPosition[2] != 0)
+          //is player
+           if(selectedPosition[2] != 0)
+           {
+             itemX = selectedPosition[0];
+             itemY = selectedPosition[1];
+             suitableOption = true;
+
+           }
+          else
           {
-            suitableOption = true;
+            suitableOption = false;
           }
-        }
-        else
-        {
-          suitableOption = false;
         }
 
         if(suitableOption)
         {
-
+          
           //updateBombBlockLives(1, 0x02);
 
           //check if it's a door (c4->c7)
@@ -1610,6 +1603,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
           }
         }
       }
+
       //placing blocks
 
 
