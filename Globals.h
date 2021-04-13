@@ -135,6 +135,7 @@ const byte waitTouch = 5;
 short digTimer = 0; //player only timers
 short digWait = 3;
 byte change = 0;
+byte playerLost = false;
 //player variables
 
 byte timeBetweenFall = 2; //how long to hold falling animation

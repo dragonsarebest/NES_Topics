@@ -852,9 +852,16 @@ void updateBombBlockLives(int amount, byte whichOne)
   }
   if(whichOne == 0x03)
   {
-    numLives += amount;
-    if(numLives > 99)
-      numLives = 99;
+    if(numLives == 0 && amount < 0)
+    {
+      playerLost = true;
+    }
+    else
+    {
+      numLives += amount;
+      if(numLives > 99)
+        numLives = 99;
+    }
   }
 
   sprintf(number, "-x%d%d -x%d%d -x%d%d", (numBombs/10)%10, numBombs%10, 
@@ -2348,6 +2355,7 @@ void main(void) {
 
     if((change&0x03) != 0)
     {
+      //updates num blocks
       updateBombBlockLives(((change&0x02) >> 1) - (change&0x01), 0x02);
       change = change & (0xFF ^ 0x03);
     }
@@ -2356,6 +2364,11 @@ void main(void) {
     {
       updatePlayerHealth(1, &player);
       change = change & (0xFF ^ 0x30);
+      if(player.alive <= 0)
+      {
+        player.alive = 10;
+        updateBombBlockLives(-1, 0x03);
+      }
     }
 
     ppu_wait_frame();
