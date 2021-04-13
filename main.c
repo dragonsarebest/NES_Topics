@@ -1305,7 +1305,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
       breaking = pad_result & attackButton;
       noBlocksAbove = aboveOrBellowPlayer(actor->x, actor->y, 1, true, lastFacingRight, 0);
 
-      if(!shift && resetTouch == 0)
+      //if(!shift && resetTouch == 0)
       {
         byte old = actor->attribute & 0x40;
         byte new;
@@ -1392,7 +1392,10 @@ char updateActor(Actor * actor, char cur_oam, int index)
       if(shift)
       {
         actor->dx = 0;
-
+        if(resetTouch > 0)
+        {
+          resetTouch--;
+        }
       }
 
       {
@@ -1433,9 +1436,9 @@ char updateActor(Actor * actor, char cur_oam, int index)
               //pressing up but cant jump.... look up instead!
               //Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
               leftRight--;
-              if(leftRight < -1)
+              if(leftRight < -2)
               {
-                leftRight = -1;
+                leftRight = -2;
               }
               lastTouch = waitTouch;
               resetTouch = waitTouch*3;
@@ -1470,10 +1473,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
         lastTouch--;
       }
 
-      if(resetTouch > 0)
-      {
-        resetTouch--;
-      }
+      
     }
 
 
