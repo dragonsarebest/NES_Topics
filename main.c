@@ -1448,9 +1448,9 @@ char updateActor(Actor * actor, char cur_oam, int index)
               //pressing up but cant jump.... look up instead!
               //Up_Down = 0x02; //0x01 = up, 0x02 = down, 0x00 = neither
               leftRight++;
-              if(leftRight > 3)
+              if(leftRight > 4)
               {
-                leftRight = 3;
+                leftRight = 4;
               }
               lastTouch = waitTouch;
               resetTouch = waitTouch*3;
@@ -1473,7 +1473,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
         lastTouch--;
       }
 
-      
+
     }
 
 
@@ -1513,16 +1513,18 @@ char updateActor(Actor * actor, char cur_oam, int index)
         int itemX, itemY, collision;
         byte suitableOption = false;
 
+        if(breaking && attacking == false)
+        {
+          attacking = true;
+          //actor->boolean |= 0x04;
+          actor->animationTimer = 0;
+        }
+
         if(!isPlayer)
         {
           breakBlock = searchPlayer(actor->x, actor->y + (upOffset*8), 0, lastFacingRight, offset);
 
-          if(breaking && attacking == false)
-          {
-            attacking = true;
-            //actor->boolean |= 0x04;
-            actor->animationTimer = 0;
-          }
+
           if((breakBlock != 0) && (breaking) || selectedPosition[2] != 0 && (breaking) || isBoss && selectedPosition[2] != 0)
           {
             suitableOption = true;
@@ -1872,7 +1874,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
     {
 
       shoudlRun = false;
-      if( actor->animationTimer < 8)
+      if( actor->animationTimer < 8 - 4*isPlayer )
       {
         actor->currentAnimation = actor->startOfAnimations+1;
 
@@ -1881,7 +1883,7 @@ char updateActor(Actor * actor, char cur_oam, int index)
         //ppu_wait_frame();
         actor->animationTimer++;
       }
-      else if(actor->animationTimer >= 8 && actor->animationTimer < 24) 
+      else if(actor->animationTimer >= 8 - 4*isPlayer && actor->animationTimer < 24 - 12*isPlayer) 
       {
         actor->currentAnimation = actor->startOfAnimations+2;
         //cur_oam = oam_meta_spr(player.act.x, player.act.y, cur_oam, PlayerMetaSprite_Attack_2);
