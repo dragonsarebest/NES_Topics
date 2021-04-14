@@ -4,6 +4,8 @@
 #include "neslib.h"
 #include "neslib.h"
 
+#include "apu.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "Util.h"
@@ -18,12 +20,7 @@
 
 //#link "vrambuf.c"
 
-/*
-// select current chr bank for sprites, 0..1
-void __fastcall__ bank_spr(unsigned char n);
-// select current chr bank for background, 0..1
-void __fastcall__ bank_bg(unsigned char n);
-*/
+//#link "apu.c"
 
 
 word setVRAMAddress(int x, int y, byte setNow )
