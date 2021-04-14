@@ -2200,6 +2200,10 @@ void main(void) {
   randomizeParticle(singleBricks, brickSpeed, 0, 0);
   // enable PPU rendeing (turn on screen)
 
+  
+  apu_init();
+  musicPtr = 0;
+
   loadWorld();
 
   ppu_on_all();
@@ -2417,6 +2421,10 @@ void main(void) {
         updateBombBlockLives(-1, 0x03);
       }
     }
+    
+    if (!musicPtr) startMusic(MainTheme);
+    //waitvsync();
+    play_music();
 
     ppu_wait_frame();
   }
