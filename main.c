@@ -22,6 +22,56 @@
 
 //#link "apu.c"
 
+byte nextMusicByte()
+{
+  return *musicPtr++;
+}
+
+void play_music() {
+  static byte chs = 0;
+  if (musicPtr) {
+    // run out duration timer yet?
+    while (cur_duration == 0) {
+      // fetch next byte in score
+      byte note = nextMusicByte();
+      // is this a note?
+      if ((note & 0x80) == 0) {
+        // pulse plays higher notes, triangle for lower if it's free
+        if (note >= BASS_NOTE || (chs & 4)) {
+          int period = note_table[note & 63];
+          // see which pulse generator is free
+          if (!(chs & 1)) {
+            APU_PULSE_DECAY(0, period, DUTY_25, 2, 10);
+            chs |= 1;
+          } else if (!(chs & 2)) {
+            APU_PULSE_DECAY(1, period, DUTY_25, 2, 10);
+            chs |= 2;
+          }
+        } else {
+          int period = triangle_note[note & 63];
+          APU_TRIANGLE_LENGTH(period, 15);
+          chs |= 4;
+        }
+      } else {
+        // end of score marker
+        if (note == 0xff)
+          musicPtr = NULL;
+        // set duration until next note
+        cur_duration = note & 63;
+        // reset channel used mask
+        chs = 0;
+      }
+    }
+    cur_duration--;
+  }
+}
+
+void startMusic(const byte * music)
+{
+  musicPtr = music;
+  cur_duration = 0;
+}
+
 
 word setVRAMAddress(int x, int y, byte setNow )
 {
