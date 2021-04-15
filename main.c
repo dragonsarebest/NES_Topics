@@ -2214,6 +2214,11 @@ void main(void) {
     change = 0;
     cur_oam = 4; //idk why this is necessary
 
+    //MainTheme, bossFight
+    if (!musicPtr) startMusic(bossFight);
+    //waitvsync();
+    play_music();
+    
     if(worldScrolling)
     {
       player.dx = 0;
@@ -2422,9 +2427,7 @@ void main(void) {
       }
     }
     
-    if (!musicPtr) startMusic(MainTheme);
-    //waitvsync();
-    play_music();
+    
 
     ppu_wait_frame();
   }
