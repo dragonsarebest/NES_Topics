@@ -1004,6 +1004,11 @@ void breakThisBlock(int itemX, int itemY, byte isPlayer)
   char block[1];
   char oldBlock;
   int i;
+  
+  if(itemX < 0 || itemX > 32 || itemY < 0 || itemY > 30)
+  {
+    return;
+  }
 
   ppu_wait_nmi();
   oldBlock = getchar_vram(itemX, itemY);
@@ -1044,6 +1049,12 @@ void breakThisBlock(int itemX, int itemY, byte isPlayer)
         break;
       }
     }
+  }
+  else if(oldBlock == newLifeBlock && itemY > 3)
+  {
+    //since we use same block in the UI
+    change |= 0x04; //add one
+    block[0] = 0x0D;
   }
   else
   {
@@ -2473,6 +2484,20 @@ void main(void) {
         player.alive = 10;
         updateBombBlockLives(-1, 0x03);
       }
+    }
+    
+    if( (change&0x0C) != 0)
+    {
+      //update numLives
+      if(change&0x04)
+      {
+        updateBombBlockLives(1, 0x03);
+      }
+      else
+      {
+        updateBombBlockLives(-1, 0x03);
+      }
+      change = change & (0xFF ^ 0x0C);
     }
 
     ppu_wait_frame();
