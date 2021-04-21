@@ -335,7 +335,8 @@ byte loadWorld()
 
   vram_inc(0);
 
-  vram_unrle(worldData[worldNumber]);
+  //vram_unrle(worldData[worldNumber]);
+  vram_unrle(&allWorldData[worldStartLocations[worldNumber]]);
   vrambuf_flush();
 
   vram_adr(addr);
