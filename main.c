@@ -400,22 +400,24 @@ byte loadWorld()
     }
   }
 
-  if(worldNumber == 0)
   {
-    //set all world stair destinations here!
+    //
+    int newWorld =  worldNumber + 1;
+    
+    if(newWorld > NumWorlds -1)
+    {
+      newWorld = worldNumber - 1;
+    }
+      
+    
+    //default
     for(i = 0; i < 8; i++)
     {
-      StairsGoToWorld[i] = 1;
+      StairsGoToWorld[i] = worldNumber + 1;
     }
   }
-  if(worldNumber == 1)
-  {
-    //set all world stair destinations here!
-    for(i = 0; i < 8; i++)
-    {
-      StairsGoToWorld[i] = 0;
-    }
-  }
+  
+  
 
   vram_adr(addr);
   ppu_on_all();
@@ -921,12 +923,31 @@ void updateBombBlockLives(int amount, byte whichOne)
 }
 
 
-void setWorldNumber(byte num)
+void setWorldNumber(int num)
 {
+
+  if(worldNumber == 0)
+  {
+    if(num < 0)
+    {
+      num = 0;
+    }
+  }
+
+  if(num > NumWorlds-1)
+  {
+    num = NumWorlds-1;
+  }
+
   old_worldNumber = worldNumber;
   worldNumber = num;
 
-  spawnBoss = true;
+  if(old_worldNumber != worldNumber)
+  {
+    spawnBoss = true;
+    worldScrolling = true;
+    ppu_off(); //makes scrolling work!!!!!!
+  }
 }
 
 
@@ -2108,12 +2129,14 @@ void main(void) {
   unsigned int i = 0, j = 0;
   byte debug = false;
   byte deathTimer = 0xF;
+  
+  int num = worldNumber;
 
   worldScrolling = false;
   scrollSwap = !worldScrolling;
   old_worldScrolling = worldScrolling;
   worldNumber = 0;
-  transition = 0x01;
+  transition = 0x02;
   //default world parameters
 
   bank_spr(1);
@@ -2201,7 +2224,7 @@ void main(void) {
   randomizeParticle(singleBricks, brickSpeed, 0, 0);
   // enable PPU rendeing (turn on screen)
 
-  
+
   apu_init();
   musicPtr = 0;
 
@@ -2219,7 +2242,7 @@ void main(void) {
     //dif (!musicPtr) startMusic(bossFight);
     //waitvsync();
     //play_music();
-    
+
     if(worldScrolling)
     {
       player.dx = 0;
@@ -2237,6 +2260,16 @@ void main(void) {
       {
         //always first thing to run once a new world is loaded
 
+        player.x = DoorPositions[0] * 8;
+        player.y = DoorPositions[1] * 8;
+        
+        if(worldNumber == 0 || worldNumber == 1)
+        {
+          //since world0 has no doors this is a special case!
+          player.x = 8;
+          //player.y = 26*8;
+        }
+        
         updatePlayerHealth(0, &player);
         updateBombBlockLives(0, 0x01);
         updateBombBlockLives(0, 0x02);
@@ -2246,13 +2279,13 @@ void main(void) {
 
         spawnBoss = false;
         //get spawn location & which boss here
-        if(worldNumber == 1 && (bossSpawnedTracker & 0x01) == 0)
+        if(worldNumber == 2 && (bossSpawnedTracker & 0x01) == 0)
         {
           bossSpawnedTracker |= 0x01; //only spawn boss once!
           bossNumber = 0;
           boss.attribute = 1;
-          boss.x = 28*8;
-          boss.y =  25*8;
+          boss.x = 26*8;
+          boss.y =  15*8;
           boss.alive = 20;
           boss.moveSpeed = 2;
           boss.jumpSpeed = 6;
@@ -2402,7 +2435,21 @@ void main(void) {
       justKilledBoss = false;
       //oam_hide_rest(cur_oam);
     }
+    
+    if(numDoors == 0)
+    {
+      
+      if(player.x <= 8 && player.dx < 0 && num != 0)
+      {
+        setWorldNumber(num - 1);
+      }
+      else if (player.x >= 30*8 && player.dx > 0)
+      {
+        setWorldNumber(num + 1);
+      }
+    }
 
+    //writeBinary(2, 10, num);
 
     //scroll world
     scrollWorld(transition, &player);
@@ -2427,8 +2474,6 @@ void main(void) {
         updateBombBlockLives(-1, 0x03);
       }
     }
-    
-    
 
     ppu_wait_frame();
   }
