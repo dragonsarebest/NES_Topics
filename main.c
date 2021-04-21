@@ -2215,9 +2215,9 @@ void main(void) {
     cur_oam = 4; //idk why this is necessary
 
     //MainTheme, bossFight
-    if (!musicPtr) startMusic(bossFight);
+    //dif (!musicPtr) startMusic(bossFight);
     //waitvsync();
-    play_music();
+    //play_music();
     
     if(worldScrolling)
     {
